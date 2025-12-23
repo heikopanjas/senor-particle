@@ -25,7 +25,7 @@
   - [aranet-kit](https://github.com/heikopanjas/aranet-kit.git) - Bluetooth sensor communication library
 - **Version Control:** Git
 - **Package Manager:** Swift Package Manager
-- **License:** TBD
+- **License:** MIT
 
 <!-- {principles} -->
 
