@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2025-12-23
+**Last updated:** 2026-03-14
 
 <!-- {mission} -->
 
@@ -9,6 +9,7 @@
 **senor-particle** is a macOS menu bar application that reads sensor data from Aranet4 and Aranet Radiation sensors via Bluetooth and displays the measurements in a custom menu bar view. The app provides real-time monitoring of environmental sensor data directly from the macOS menu bar.
 
 ### Key Features
+
 - Bluetooth connectivity to Aranet4 sensors (CO2, temperature, humidity, pressure)
 - Bluetooth connectivity to Aranet Radiation sensors
 - Real-time sensor data display in menu bar
@@ -85,7 +86,7 @@ When initializing a session or analyzing the workspace, refer to instruction fil
 
 - **Menu Bar Architecture**: Use `NSStatusItem` and `NSStatusBarButton` for menu bar integration
 - **Sensor Communication**: Use `AranetKit` library for all Bluetooth operations (scanning, reading sensor data)
-- **AranetKit Integration**: 
+- **AranetKit Integration**:
   - Use `AranetClient` for device discovery and data retrieval
   - Leverage async/await API provided by AranetKit
   - No manual CoreBluetooth management needed - handled by AranetKit
@@ -1691,3 +1692,19 @@ After making ANY code changes:
 - **Architecture guidelines**: Established patterns for menu bar integration, AranetKit integration, and periodic monitoring
 - **Build system**: Configured for Xcode-based development with Swift Package Manager dependencies
 - **Coding standards**: Adopted comprehensive Swift conventions from DoomKit guidelines (4-space indentation, explicit access control, async/await for concurrency)
+
+### 2026-03-12
+
+- **Replaced Pomodoro scaffolding with Aranet sensor functionality**: Removed Task, TaskStatus, TaskTimes models and TaskView from Sarah Reichelt tutorial starter code
+- **Added aranet-kit SPM dependency**: Configured in pbxproj using develop branch from <https://github.com/heikopanjas/aranet-kit.git>
+- **Bluetooth permissions**: Created entitlements file with com.apple.security.device.bluetooth for App Sandbox, added NSBluetoothAlwaysUsageDescription to build settings
+- **Architecture: SensorManager pattern**: Single AranetClient instance for all devices. AranetKit isolates per-peripheral state via ReadOperation so concurrent monitoring is safe. Uses AranetKit monitor() AsyncStream for smart scheduling
+- **Architecture: Programmatic menu**: Menu is now built entirely in code (removed storyboard menu dependency). MenuManager populates device items on menuWillOpen and clears on menuDidClose
+- **File structure**: AppDelegate.swift (entry point, scan/monitor orchestration), SensorManager.swift (device scanning and monitoring), MenuManager.swift (menu lifecycle), SensorDeviceView.swift (custom NSView per device)
+- **Status bar display**: Shows first available reading's key metric (CO2 ppm for Aranet4, radiation rate for Aranet Radiation, temperature for Aranet2)
+
+### 2026-03-14
+
+- **Updated AranetKit to e0bffa8**: Picked up multi-device support (e170d85), DRY refactoring (56d409e), and native radiation status parsing (e0bffa8). Updated Package.resolved pin from 97dcfe7 to e0bffa8
+- **Simplified SensorDeviceView.effectiveStatus()**: Removed manual radiation dose-rate threshold logic (0.3/1.0 uSv/h boundaries). AranetKit now parses the native status byte (byte 27) for Aranet Radiation, so reading.status is populated for all device types except Aranet2
+- **Adopted AranetKit default scan timeout**: Removed explicit 10s timeout from SensorManager.scan(), using AranetKit new 15s default for better device discovery
