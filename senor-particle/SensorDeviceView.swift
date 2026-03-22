@@ -5,7 +5,7 @@ class SensorDeviceView: NSView {
     private let iconBackgroundView = NSView()
     private let iconView = NSImageView()
     private let nameLabel = NSTextField()
-    private let batteryLabel = NSTextField()
+    private let batteryView = BatteryView()
     private var rowLabels: [NSTextField] = []
     private var rowValues: [NSTextField] = []
 
@@ -39,21 +39,37 @@ class SensorDeviceView: NSView {
     func configure(device: AranetDevice, reading: AranetReading?, lastUpdated: Date? = nil) {
         nameLabel.stringValue = reading?.name ?? device.name
 
+        let batteryWidth: CGFloat = 56
+        batteryView.frame = NSRect(
+            x: frame.width - rightPadding - batteryWidth,
+            y: topPadding,
+            width: batteryWidth,
+            height: nameRowHeight
+        )
+
+        nameLabel.frame = NSRect(
+            x: contentLeft,
+            y: topPadding,
+            width: frame.width - contentLeft - rightPadding - batteryWidth - 4,
+            height: nameRowHeight
+        )
+
         let status = effectiveStatus(from: reading)
 
         if let reading {
             iconView.image = iconForDeviceType(reading.deviceType)
             iconView.contentTintColor = .white
             iconBackgroundView.layer?.backgroundColor = backgroundForStatus(status).cgColor
-            batteryLabel.stringValue = "\(reading.battery)%"
-        } else {
+            batteryView.configure(battery: Int(reading.battery))
+        }
+        else {
             iconView.image = NSImage(
                 systemSymbolName: "dot.radiowaves.left.and.right",
                 accessibilityDescription: "sensor"
             )
             iconView.contentTintColor = .white
             iconBackgroundView.layer?.backgroundColor = NSColor.tertiaryLabelColor.cgColor
-            batteryLabel.stringValue = ""
+            batteryView.clear()
         }
 
         for label in rowLabels { label.removeFromSuperview() }
@@ -111,21 +127,6 @@ class SensorDeviceView: NSView {
             width: iconSize,
             height: iconSize
         )
-
-        let batteryWidth: CGFloat = 40
-        batteryLabel.frame = NSRect(
-            x: frame.width - rightPadding - batteryWidth,
-            y: topPadding,
-            width: batteryWidth,
-            height: nameRowHeight
-        )
-
-        nameLabel.frame = NSRect(
-            x: contentLeft,
-            y: topPadding,
-            width: frame.width - contentLeft - rightPadding - batteryWidth - 4,
-            height: nameRowHeight
-        )
     }
 
     // MARK: - Setup
@@ -141,10 +142,7 @@ class SensorDeviceView: NSView {
         configureLabel(nameLabel, size: 13, weight: .semibold)
         addSubview(nameLabel)
 
-        configureLabel(batteryLabel, size: 11, weight: .regular)
-        batteryLabel.alignment = .right
-        batteryLabel.textColor = .secondaryLabelColor
-        addSubview(batteryLabel)
+        addSubview(batteryView)
     }
 
     private func configureLabel(_ label: NSTextField, size: CGFloat, weight: NSFont.Weight) {
