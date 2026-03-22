@@ -1,200 +1,120 @@
-# senor-particle
+# Señor Particle
 
-A macOS menu bar application for monitoring environmental sensor data from Aranet4 and Aranet Radiation sensors in real-time.
+A macOS menu bar application for real-time monitoring of Aranet Bluetooth sensors. Displays CO2, temperature, humidity, pressure, and radiation measurements directly in the menu bar.
 
 ## Features
 
-- 📊 Real-time sensor data display in macOS menu bar
-- 🔵 Bluetooth connectivity to Aranet4 sensors (CO2, temperature, humidity, pressure)
-- ☢️ Support for Aranet Radiation sensors
-- 🏠 Support for Aranet2 and Aranet Radon Plus sensors
-- 🔄 Background monitoring with automatic updates
-- 🎨 Custom menu bar view with clear data visualization
-- ⚡ Efficient resource usage for always-on monitoring
-- 🔓 No sensor pairing required - reads directly via BLE
-
-## Requirements
-
-- **macOS**: 11.0 (Big Sur) or later
-- **Xcode**: 14.0 or later
-- **Swift**: 5.7 or later
-- **Bluetooth**: Built-in or external Bluetooth adapter
-- **Sensors**: Aranet4 and/or Aranet Radiation sensors
-
-## Installation
-
-### From Source
-
-1. Clone the repository:
-
-```bash
-git clone https://github.com/yourusername/senor-particle.git
-cd senor-particle
-```
-
-2. Open the project in Xcode:
-
-```bash
-open senor-particle.xcodeproj
-```
-
-3. Build and run:
-   - Press `Cmd + R` in Xcode
-   - Or use the command line:
-
-```bash
-xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -configuration Debug
-```
-
-## Usage
-
-1. **Launch the app**: The sensor icon will appear in your macOS menu bar
-2. **Grant Bluetooth permissions**: Allow the app to access Bluetooth when prompted
-3. **Connect sensors**: The app will automatically discover nearby Aranet sensors
-4. **View data**: Click the menu bar icon to see detailed sensor readings
+- Real-time sensor data in the macOS menu bar
+- Automatic Bluetooth discovery and connection
+- Concurrent multi-device monitoring with automatic reconnection
+- Per-device status indicator (green/yellow/red) based on native sensor thresholds
+- Battery level display for each device
+- No sensor pairing required - reads directly via BLE
 
 ## Supported Sensors
 
-All sensor support is provided by [AranetKit](https://github.com/heikopanjas/aranet-kit.git).
+All Bluetooth communication is handled by [AranetKit](https://github.com/heikopanjas/aranet-kit).
 
-### Aranet4
+| Device | Measurements | Status |
+|---|---|---|
+| [Aranet4](https://aranet.com/en/home/products/aranet4-home) | CO2 (ppm), temperature, humidity, pressure | Fully supported |
+| [Aranet Radiation](https://aranet.com/en/home/products/aranet-radiation-sensor) | Dose rate (uSv/h), cumulative dose | Fully supported |
+| [Aranet2](https://aranet.com/en/home/products/aranet2-home) | Temperature, humidity | Experimental |
+| [Aranet Radon Plus](https://aranet.com/en/home/products/aranet-radon-sensor) | Radon concentration (Bq/m3) | Experimental |
 
-- CO₂ concentration (ppm)
-- Temperature (°C/°F)
-- Relative humidity (%)
-- Atmospheric pressure (hPa/inHg)
-- Battery level
-- Status display indicator
-- Measurement intervals and age
+## Requirements
 
-### Aranet2
+- macOS 15.7 (Sequoia) or later
+- Xcode 16+ / Swift 5
+- Bluetooth adapter
+- One or more Aranet sensors
 
-- Temperature (°C/°F)
-- Relative humidity (%)
-- Battery level
+## Installation
 
-### Aranet Radiation
+Clone the repository and open in Xcode:
 
-- Radiation levels (μSv/h)
-- Battery level
+```bash
+git clone https://github.com/heikopanjas/senor-particle.git
+cd senor-particle
+open senor-particle.xcodeproj
+```
 
-### Aranet Radon Plus
+Build and run with `Cmd + R`, or from the command line:
 
-- Radon concentration (Bq/m³)
-- Battery level
+```bash
+xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -configuration Debug build
+```
 
-## Development
+Dependencies are resolved automatically via Swift Package Manager.
 
-### Project Structure
+## Usage
+
+1. Launch the app -- a sensor icon appears in the menu bar
+2. Grant Bluetooth permission when prompted
+3. The app scans for nearby Aranet sensors on launch
+4. The menu bar shows the primary metric from the first connected device (CO2 for Aranet4, dose rate for Aranet Radiation, temperature for Aranet2)
+5. Click the menu bar icon to see detailed readings for all connected devices
+
+## Architecture
 
 ```
 senor-particle/
-├── senor-particle/          # Main application source
-│   ├── AppDelegate.swift    # Application lifecycle
-│   ├── ViewController.swift # Main view controller
-│   └── Assets.xcassets/     # App icons and assets
-├── AGENTS.md               # AI coding agent instructions
-└── README.md              # This file
+├── AppDelegate.swift        # Entry point, status bar setup, scan/monitor orchestration
+├── SensorManager.swift      # Device discovery, monitoring with retry logic
+├── MenuManager.swift        # Programmatic NSMenu lifecycle (populate on open, clear on close)
+├── SensorDeviceView.swift   # Custom NSView per device (icon, readings, status badge)
+├── BatteryView.swift        # Battery icon and percentage display
+├── Base.lproj/
+│   └── Main.storyboard      # Minimal storyboard (app delegate wiring only)
+└── Assets.xcassets/         # App icons and accent color
 ```
 
-### Architecture
+**AppDelegate** creates the `NSStatusItem`, starts a Bluetooth scan via `SensorManager`, and begins monitoring discovered devices. Status bar text updates on each new reading.
 
-The application follows a clean architecture pattern:
+**SensorManager** wraps `AranetClient` from AranetKit. It scans for devices, then spawns a monitoring task per device using AranetKit's `monitor()` AsyncStream. Disconnections are handled with exponential backoff retry (up to 5 attempts).
 
-- **Menu Bar Integration**: `NSStatusItem` for menu bar presence
-- **Sensor Communication**: [AranetKit](https://github.com/heikopanjas/aranet-kit.git) library for Bluetooth operations
-- **AranetClient**: Async/await API for device scanning and sensor readings
-- **Data Models**: Structured sensor reading models from AranetKit
-- **UI Updates**: Swift concurrency for responsive interface
-- **Periodic Monitoring**: Schedule updates based on device intervals
+**MenuManager** acts as `NSMenuDelegate`. On `menuWillOpen`, it builds a menu item per device with a custom `SensorDeviceView`. On `menuDidClose`, it clears dynamic items. Live updates refresh the menu while open.
 
-### Building
+**SensorDeviceView** renders a device icon (color-coded by status), device name, battery level, and measurement rows. Status colors come from the native sensor status byte parsed by AranetKit.
+
+## Building
 
 ```bash
-# Debug build (development)
+# Debug build
 xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -configuration Debug build
 
-# Release build (distribution)
+# Release build
 xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -configuration Release build
 ```
 
-### Testing
-
-```bash
-# Run all tests
-xcodebuild test -project senor-particle.xcodeproj -scheme senor-particle
-
-# Or in Xcode: Cmd + U
-```
-
-### Code Style
-
-This project follows comprehensive Swift coding conventions:
-
-- 4-space indentation
-- PascalCase for types, camelCase for properties and functions
-- Explicit access control modifiers
-- DocC-style documentation for public APIs
-
-See `AGENTS.md` for complete coding standards.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-Please follow the commit message guidelines in `AGENTS.md`.
-
 ## Troubleshooting
 
-### Bluetooth Connection Issues
+### Bluetooth Permission Denied
 
-- Ensure Bluetooth is enabled in System Preferences
-- Check that sensors are powered on and in range
-- Try restarting the app
-- Reset Bluetooth module: Hold Shift + Option and click Bluetooth icon in menu bar
+Go to **System Settings > Privacy & Security > Bluetooth** and enable access for the app.
 
-### Sensor Not Detected
+### No Devices Found
 
-- Verify sensor is compatible (Aranet4 or Aranet Radiation)
-- Ensure sensor is not connected to another device
-- Check sensor battery level
-- Move sensor closer to Mac
+- Ensure sensors are powered on and nearby
+- Enable "Smart Home integrations" in the Aranet Home mobile app
+- Check that sensors are not exclusively connected to another app
 
-### Performance Issues
+### Reconnection
 
-- Check Activity Monitor for resource usage
-- Ensure latest macOS version is installed
-- Try clean build: `Cmd + Shift + K` then `Cmd + B`
+The app automatically reconnects with exponential backoff if a sensor disconnects. After 5 failed attempts, monitoring for that device stops. Relaunch the app to retry.
 
 ## Privacy
 
-This app:
-
-- Only accesses Bluetooth for sensor communication
-- Does not collect or transmit any data
-- Does not require internet connectivity
+- Only uses Bluetooth for sensor communication
+- No data collection or network activity
 - All sensor data stays on your device
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+MIT License -- see [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
-- [Aranet](https://aranet.com/) for their excellent environmental sensors
-- [AranetKit](https://github.com/heikopanjas/aranet-kit.git) - Swift library for Aranet sensor communication
-- [aranet4-python](https://github.com/Anrijs/Aranet4-Python) by Anrijs Jargans - Original Python implementation
-- Swift and macOS developer community
-
-## Contact
-
-For questions, issues, or suggestions, please open an issue on GitHub.
-
----
-
-**Note**: This project is under active development. Features and documentation may change.
-
+- [Aranet](https://aranet.com/) for their environmental sensors
+- [AranetKit](https://github.com/heikopanjas/aranet-kit) -- Swift library for Aranet Bluetooth communication
+- [aranet4-python](https://github.com/Anrijs/Aranet4-Python) by Anrijs Jargans -- original Python implementation

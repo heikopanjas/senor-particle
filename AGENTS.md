@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2026-03-14
+**Last updated:** 2026-03-22
 
 <!-- {mission} -->
 
@@ -1708,3 +1708,7 @@ After making ANY code changes:
 - **Updated AranetKit to e0bffa8**: Picked up multi-device support (e170d85), DRY refactoring (56d409e), and native radiation status parsing (e0bffa8). Updated Package.resolved pin from 97dcfe7 to e0bffa8
 - **Simplified SensorDeviceView.effectiveStatus()**: Removed manual radiation dose-rate threshold logic (0.3/1.0 uSv/h boundaries). AranetKit now parses the native status byte (byte 27) for Aranet Radiation, so reading.status is populated for all device types except Aranet2
 - **Adopted AranetKit default scan timeout**: Removed explicit 10s timeout from SensorManager.scan(), using AranetKit new 15s default for better device discovery
+
+### 2026-03-22
+
+- **Switched aranet-kit to published version**: Changed SPM dependency from branch-based (develop) to version-based (upToNextMajorVersion from 3.2.0) now that the package is published on GitHub with tagged releases

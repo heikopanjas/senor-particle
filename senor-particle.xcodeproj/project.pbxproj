@@ -349,8 +349,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/heikopanjas/aranet-kit.git";
 			requirement = {
-				branch = develop;
-				kind = branch;
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.2.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
