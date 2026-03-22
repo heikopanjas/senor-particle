@@ -11,7 +11,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.statusItem = statusItem
 
-        statusItem.button?.title = " Se\u{00F1}or Particle"
+        statusItem.button?.title = " n/a"
         statusItem.button?.imagePosition = .imageLeading
         statusItem.button?.image = NSImage(
             systemSymbolName: "aqi.medium",
