@@ -86,7 +86,7 @@ class SensorDeviceView: NSView {
         for row in rows {
             let labelField = makeLabel(size: 12, weight: .regular)
             labelField.stringValue = row.label
-            labelField.textColor = .tertiaryLabelColor
+            labelField.textColor = .secondaryLabelColor
             labelField.frame = NSRect(x: contentLeft, y: y, width: labelWidth, height: rowHeight)
             addSubview(labelField)
             rowLabels.append(labelField)
@@ -105,7 +105,7 @@ class SensorDeviceView: NSView {
         if let lastUpdated, reading != nil {
             y += 2
             let ageField = makeLabel(size: 10, weight: .regular)
-            ageField.textColor = .tertiaryLabelColor
+            ageField.textColor = .secondaryLabelColor
             ageField.stringValue = formatTimestamp(lastUpdated)
             ageField.frame = NSRect(x: contentLeft, y: y, width: frame.width - contentLeft - rightPadding, height: 14)
             addSubview(ageField)
