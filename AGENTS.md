@@ -1488,31 +1488,35 @@ open senor-particle.xcodeproj
 
 ### Development (Command Line)
 
+Always pass `-destination "generic/platform=macOS"` to avoid ambiguous destination warnings.
+
 ```bash
 # Build the project (debug)
-xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -configuration Debug build
-
-# Run the application (build and launch)
-xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -configuration Debug
+xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -destination "generic/platform=macOS" -configuration Debug build
 
 # Run tests
-xcodebuild test -project senor-particle.xcodeproj -scheme senor-particle
+xcodebuild test -project senor-particle.xcodeproj -scheme senor-particle -destination "generic/platform=macOS"
 
 # Clean build artifacts
-xcodebuild clean -project senor-particle.xcodeproj -scheme senor-particle
+xcodebuild clean -project senor-particle.xcodeproj -scheme senor-particle -destination "generic/platform=macOS"
 ```
 
 ### Build & Deploy
 
+Use `build.sh` for archive, export, and optional notarization:
+
 ```bash
-# Build for release (optimized)
-xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -configuration Release build
+# Archive and export with Developer ID signing
+./build.sh
 
-# Archive for distribution
-xcodebuild archive -project senor-particle.xcodeproj -scheme senor-particle -archivePath ./build/senor-particle.xcarchive
+# Clean first, then archive and export
+./build.sh --clean
 
-# Export archive (requires export options plist)
-xcodebuild -exportArchive -archivePath ./build/senor-particle.xcarchive -exportPath ./build/export -exportOptionsPlist ExportOptions.plist
+# Archive, export, notarize, and staple
+./build.sh --notarize
+
+# Show help
+./build.sh --help
 ```
 
 ### Package Management
