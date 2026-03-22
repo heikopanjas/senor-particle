@@ -122,3 +122,4 @@ Temporary Items
 # Build artifacts
 *.app
 *.xcarchive
+buildServer.json
