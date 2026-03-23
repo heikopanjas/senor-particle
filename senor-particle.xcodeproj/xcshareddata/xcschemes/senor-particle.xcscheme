@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "428A10462EFAC80A00825D79"
-               BuildableName = "senor-particle.app"
+               BuildableName = "Senor Particle.app"
                BlueprintName = "senor-particle"
                ReferencedContainer = "container:senor-particle.xcodeproj">
             </BuildableReference>
@@ -45,7 +45,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "428A10462EFAC80A00825D79"
-            BuildableName = "senor-particle.app"
+            BuildableName = "Senor Particle.app"
             BlueprintName = "senor-particle"
             ReferencedContainer = "container:senor-particle.xcodeproj">
          </BuildableReference>
@@ -62,7 +62,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "428A10462EFAC80A00825D79"
-            BuildableName = "senor-particle.app"
+            BuildableName = "Senor Particle.app"
             BlueprintName = "senor-particle"
             ReferencedContainer = "container:senor-particle.xcodeproj">
          </BuildableReference>

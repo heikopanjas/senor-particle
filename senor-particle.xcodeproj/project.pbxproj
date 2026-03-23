@@ -11,7 +11,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		428A10472EFAC80A00825D79 /* senor-particle.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "senor-particle.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		428A10472EFAC80A00825D79 /* Senor Particle.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Senor Particle.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -45,7 +45,7 @@
 		428A10482EFAC80A00825D79 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				428A10472EFAC80A00825D79 /* senor-particle.app */,
+				428A10472EFAC80A00825D79 /* Senor Particle.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -73,7 +73,7 @@
 				42AA10612EFBC80A00825D79 /* AranetKit */,
 			);
 			productName = "senor-particle";
-			productReference = 428A10472EFAC80A00825D79 /* senor-particle.app */;
+			productReference = 428A10472EFAC80A00825D79 /* Senor Particle.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -270,6 +270,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Senor Particle needs Bluetooth to communicate with Aranet sensors.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -284,7 +285,7 @@
 				PRODUCT_MODULE_NAME = senor_particle;
 				PRODUCT_NAME = "Senor Particle";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "Senor Particle Direct Distribution";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "Senor Particle macOS";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -311,6 +312,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Senor Particle needs Bluetooth to communicate with Aranet sensors.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -325,7 +327,7 @@
 				PRODUCT_MODULE_NAME = senor_particle;
 				PRODUCT_NAME = "Senor Particle";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "Senor Particle Direct Distribution";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "Senor Particle macOS";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
