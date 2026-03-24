@@ -29,10 +29,7 @@ class SensorDeviceView: NSView {
         setupFixedSubviews()
     }
 
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
+    @available(*, unavailable) required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     // MARK: - Configuration
 
@@ -41,18 +38,11 @@ class SensorDeviceView: NSView {
 
         let batteryWidth: CGFloat = 56
         batteryView.frame = NSRect(
-            x: frame.width - rightPadding - batteryWidth,
-            y: topPadding,
-            width: batteryWidth,
-            height: nameRowHeight
-        )
+            x: frame.width - rightPadding - batteryWidth, y: topPadding, width: batteryWidth, height: nameRowHeight)
 
         nameLabel.frame = NSRect(
-            x: contentLeft,
-            y: topPadding,
-            width: frame.width - contentLeft - rightPadding - batteryWidth - 4,
-            height: nameRowHeight
-        )
+            x: contentLeft, y: topPadding, width: frame.width - contentLeft - rightPadding - batteryWidth - 4,
+            height: nameRowHeight)
 
         let status = effectiveStatus(from: reading)
 
@@ -64,9 +54,7 @@ class SensorDeviceView: NSView {
         }
         else {
             iconView.image = NSImage(
-                systemSymbolName: "dot.radiowaves.left.and.right",
-                accessibilityDescription: "sensor"
-            )
+                systemSymbolName: "dot.radiowaves.left.and.right", accessibilityDescription: "sensor")
             iconView.contentTintColor = .white
             iconBackgroundView.layer?.backgroundColor = NSColor.tertiaryLabelColor.cgColor
             batteryView.clear()
@@ -121,12 +109,7 @@ class SensorDeviceView: NSView {
         iconBackgroundView.layer?.cornerRadius = badgeSize / 2
 
         let iconInset = (badgeSize - iconSize) / 2
-        iconView.frame = NSRect(
-            x: leftPadding + iconInset,
-            y: badgeY + iconInset,
-            width: iconSize,
-            height: iconSize
-        )
+        iconView.frame = NSRect(x: leftPadding + iconInset, y: badgeY + iconInset, width: iconSize, height: iconSize)
     }
 
     // MARK: - Setup
@@ -168,21 +151,15 @@ class SensorDeviceView: NSView {
     }
 
     private func readingRows(from reading: AranetReading?) -> [ReadingRow] {
-        guard let reading else {
-            return [ReadingRow(label: "", value: "Connecting\u{2026}")]
-        }
+        guard let reading else { return [ReadingRow(label: "", value: "Connecting\u{2026}")] }
 
         var rows: [ReadingRow] = []
 
-        if let co2 = reading.co2 {
-            rows.append(ReadingRow(label: "CO\u{2082}", value: "\(co2) ppm"))
-        }
+        if let co2 = reading.co2 { rows.append(ReadingRow(label: "CO\u{2082}", value: "\(co2) ppm")) }
         if let temp = reading.temperature {
             rows.append(ReadingRow(label: "Temperature", value: String(format: "%.1f \u{00B0}C", temp.value)))
         }
-        if let humidity = reading.humidity {
-            rows.append(ReadingRow(label: "Humidity", value: "\(humidity)%"))
-        }
+        if let humidity = reading.humidity { rows.append(ReadingRow(label: "Humidity", value: "\(humidity)%")) }
         if let pressure = reading.pressure {
             rows.append(ReadingRow(label: "Pressure", value: String(format: "%.1f hPa", pressure.value)))
         }
@@ -204,9 +181,7 @@ class SensorDeviceView: NSView {
         return formatter
     }()
 
-    private func formatTimestamp(_ date: Date) -> String {
-        return Self.timestampFormatter.string(from: date)
-    }
+    private func formatTimestamp(_ date: Date) -> String { return Self.timestampFormatter.string(from: date) }
 
     // MARK: - Status
 
@@ -231,8 +206,7 @@ class SensorDeviceView: NSView {
             case .unknown: name = "dot.radiowaves.left.and.right"
         }
         let config = NSImage.SymbolConfiguration(pointSize: iconSize, weight: .bold)
-        return NSImage(systemSymbolName: name, accessibilityDescription: type.name)?
-            .withSymbolConfiguration(config)
+        return NSImage(systemSymbolName: name, accessibilityDescription: type.name)?.withSymbolConfiguration(config)
     }
 
     private func backgroundForStatus(_ status: AranetStatusColor?) -> NSColor {

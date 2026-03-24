@@ -24,11 +24,7 @@ class SensorManager {
         defer { isScanning = false }
 
         let found = try await client.scan()
-        for device in found {
-            if devices[device.id] == nil {
-                devices[device.id] = MonitoredDevice(device: device)
-            }
-        }
+        for device in found where devices[device.id] == nil { devices[device.id] = MonitoredDevice(device: device) }
         onUpdate?()
     }
 
@@ -41,15 +37,11 @@ class SensorManager {
     }
 
     func stopMonitoring() {
-        for (_, task) in monitoringTasks {
-            task.cancel()
-        }
+        for (_, task) in monitoringTasks { task.cancel() }
         monitoringTasks.removeAll()
     }
 
-    var sortedDevices: [MonitoredDevice] {
-        devices.values.sorted { $0.device.name < $1.device.name }
-    }
+    var sortedDevices: [MonitoredDevice] { devices.values.sorted { $0.device.name < $1.device.name } }
 
     // MARK: - Private
 
@@ -62,14 +54,12 @@ class SensorManager {
             for await result in stream {
                 if Task.isCancelled { return }
 
-                switch result {
-                    case .success(let reading):
-                        retryCount = 0
-                        devices[id]?.reading = reading
-                        devices[id]?.lastUpdated = Date()
-                        onUpdate?()
-                    case .failure:
-                        break
+                switch result { case .success(let reading):
+                    retryCount = 0
+                    devices[id]?.reading = reading
+                    devices[id]?.lastUpdated = Date()
+                    onUpdate?()
+                    case .failure: break
                 }
             }
 
@@ -82,7 +72,9 @@ class SensorManager {
             }
 
             let delay = baseRetryDelay * pow(2.0, Double(retryCount - 1))
-            NSLog("[SensorManager] Reconnecting to %@ in %.0fs (attempt %d/%d)", device.name, delay, retryCount, maxRetries)
+            NSLog(
+                "[SensorManager] Reconnecting to %@ in %.0fs (attempt %d/%d)", device.name, delay, retryCount,
+                maxRetries)
             try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
         }
     }

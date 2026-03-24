@@ -20,10 +20,7 @@ class BatteryView: NSView {
         setupSubviews()
     }
 
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
+    @available(*, unavailable) required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     func configure(battery: Int) {
         label.stringValue = "\(battery)%"
@@ -31,10 +28,7 @@ class BatteryView: NSView {
 
         let symbolName = batterySymbolName(for: battery)
         let config = NSImage.SymbolConfiguration(pointSize: iconHeight, weight: .regular)
-        imageView.image = NSImage(
-            systemSymbolName: symbolName,
-            accessibilityDescription: "Battery \(battery)%"
-        )?.withSymbolConfiguration(config)
+        imageView.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Battery \(battery)%")?.withSymbolConfiguration(config)
         imageView.contentTintColor = battery < 7 ? .systemRed : .secondaryLabelColor
 
         layoutContent()

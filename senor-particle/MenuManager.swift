@@ -12,13 +12,7 @@ class MenuManager: NSObject, NSMenuDelegate {
 
         menu.delegate = self
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(
-            NSMenuItem(
-                title: "Quit Se\u{00F1}or Particle",
-                action: #selector(NSApplication.terminate(_:)),
-                keyEquivalent: "q"
-            )
-        )
+        menu.addItem(NSMenuItem(title: "Quit Se\u{00F1}or Particle", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
     }
 
     func refreshIfNeeded() {
@@ -78,8 +72,6 @@ class MenuManager: NSObject, NSMenuDelegate {
 
     private func clearDeviceItems() {
         let fixedItemCount = 2
-        while menu.items.count > fixedItemCount {
-            menu.removeItem(at: 0)
-        }
+        while menu.items.count > fixedItemCount { menu.removeItem(at: 0) }
     }
 }
