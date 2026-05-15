@@ -123,3 +123,6 @@ Temporary Items
 *.app
 *.xcarchive
 buildServer.json
+
+# Cursor or VSCode artifacts
+.vorg.db
