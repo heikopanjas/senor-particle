@@ -1,6 +1,11 @@
 import AranetKit
 import Foundation
 
+extension Notification.Name {
+    static let aranetSensorDidUpdate = Notification.Name("aranetSensorDidUpdate")
+    static let aranetScanStateDidChange = Notification.Name("aranetScanStateDidChange")
+}
+
 struct MonitoredDevice {
     let device: AranetDevice
     var reading: AranetReading?
@@ -12,7 +17,9 @@ class SensorManager {
     private var monitoringTasks: [UUID: Task<Void, Never>] = [:]
 
     private(set) var devices: [UUID: MonitoredDevice] = [:]
-    private(set) var isScanning = false
+    private(set) var isScanning = false {
+        didSet { NotificationCenter.default.post(name: .aranetScanStateDidChange, object: self) }
+    }
 
     private let maxRetries = 5
     private let baseRetryDelay: TimeInterval = 5
@@ -23,9 +30,21 @@ class SensorManager {
         isScanning = true
         defer { isScanning = false }
 
-        let found = try await client.scan()
+        let timeout = UserDefaults.standard.double(forKey: "scanTimeout")
+        let found = try await client.scan(timeout: timeout > 0 ? timeout : 15.0)
         for device in found where devices[device.id] == nil { devices[device.id] = MonitoredDevice(device: device) }
         onUpdate?()
+    }
+
+    func rescan() {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                try await self.scan()
+                self.startMonitoring()
+            }
+            catch { NSLog("[SensorManager] Rescan failed: %@", error.localizedDescription) }
+        }
     }
 
     func startMonitoring() {
@@ -59,6 +78,7 @@ class SensorManager {
                     devices[id]?.reading = reading
                     devices[id]?.lastUpdated = Date()
                     onUpdate?()
+                    NotificationCenter.default.post(name: .aranetSensorDidUpdate, object: self)
                     case .failure: break
                 }
             }

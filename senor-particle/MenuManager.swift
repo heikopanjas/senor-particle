@@ -4,6 +4,8 @@ class MenuManager: NSObject, NSMenuDelegate {
     let menu: NSMenu
     private weak var sensorManager: SensorManager?
     private var isOpen = false
+    private var settingsWindowController: SettingsWindowController?
+    private var rescanItem: NSMenuItem?
 
     init(menu: NSMenu, sensorManager: SensorManager) {
         self.menu = menu
@@ -12,6 +14,24 @@ class MenuManager: NSObject, NSMenuDelegate {
 
         menu.delegate = self
         menu.addItem(NSMenuItem.separator())
+
+        let rescan = NSMenuItem(title: "Rescan", action: #selector(rescan), keyEquivalent: "r")
+        rescan.target = self
+        menu.addItem(rescan)
+        rescanItem = rescan
+
+        menu.addItem(NSMenuItem.separator())
+
+        let settingsItem = NSMenuItem(
+            title: "Settings\u{2026}",
+            action: #selector(openSettings),
+            keyEquivalent: ","
+        )
+        settingsItem.target = self
+        menu.addItem(settingsItem)
+
+        menu.addItem(NSMenuItem.separator())
+
         menu.addItem(NSMenuItem(title: "Quit Se\u{00F1}or Particle", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
     }
 
@@ -38,6 +58,8 @@ class MenuManager: NSObject, NSMenuDelegate {
         clearDeviceItems()
 
         guard let sensorManager else { return }
+
+        rescanItem?.isEnabled = !sensorManager.isScanning
 
         if sensorManager.isScanning {
             let item = NSMenuItem(title: "Scanning for devices...", action: nil, keyEquivalent: "")
@@ -70,8 +92,19 @@ class MenuManager: NSObject, NSMenuDelegate {
         }
     }
 
+    @objc private func rescan() {
+        sensorManager?.rescan()
+    }
+
+    @objc private func openSettings() {
+        if settingsWindowController == nil, let sensorManager {
+            settingsWindowController = SettingsWindowController(sensorManager: sensorManager)
+        }
+        settingsWindowController?.showAndBringToFront()
+    }
+
     private func clearDeviceItems() {
-        let fixedItemCount = 2
+        let fixedItemCount = 6
         while menu.items.count > fixedItemCount { menu.removeItem(at: 0) }
     }
 }

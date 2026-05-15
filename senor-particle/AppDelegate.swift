@@ -5,6 +5,7 @@ import Cocoa
     private var statusItem: NSStatusItem?
     private var sensorManager: SensorManager?
     private var menuManager: MenuManager?
+    private var notificationManager: NotificationManager?
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -28,6 +29,14 @@ import Cocoa
         }
 
         menuManager = MenuManager(menu: menu, sensorManager: sensorManager)
+        notificationManager = NotificationManager(sensorManager: sensorManager)
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleScanStateChange),
+            name: .aranetScanStateDidChange,
+            object: nil
+        )
 
         Task {
             do {
@@ -43,6 +52,15 @@ import Cocoa
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { return true }
 
     // MARK: - Status Bar
+
+    @objc private func handleScanStateChange() {
+        if sensorManager?.isScanning == true {
+            statusItem?.button?.title = " \u{2026}"
+        }
+        else if sensorManager?.sortedDevices.first(where: { $0.reading != nil }) == nil {
+            statusItem?.button?.title = " n/a"
+        }
+    }
 
     private func updateStatusBar() {
         guard let reading = sensorManager?.sortedDevices.first(where: { $0.reading != nil })?.reading else { return }
