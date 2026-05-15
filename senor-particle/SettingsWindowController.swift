@@ -14,6 +14,23 @@ enum NotificationPreferences {
     }
 }
 
+// MARK: - Device name preferences
+
+enum DeviceNamePreferences {
+    static func name(for deviceId: UUID) -> String? {
+        UserDefaults.standard.string(forKey: "deviceName.\(deviceId.uuidString)")
+    }
+
+    static func setName(_ name: String, for deviceId: UUID) {
+        if name.isEmpty {
+            UserDefaults.standard.removeObject(forKey: "deviceName.\(deviceId.uuidString)")
+        }
+        else {
+            UserDefaults.standard.set(name, forKey: "deviceName.\(deviceId.uuidString)")
+        }
+    }
+}
+
 // MARK: - Toolbar identifiers
 
 extension NSToolbarItem.Identifier {
@@ -259,6 +276,7 @@ class GeneralViewController: NSViewController {
 class DevicesViewController: NSViewController {
     private weak var sensorManager: SensorManager?
     private var tableView: NSTableView!
+    private var rescanButton: NSButton!
 
     override var preferredContentSize: NSSize {
         get { isViewLoaded ? view.bounds.size : NSSize(width: 420, height: 300) }
@@ -289,29 +307,52 @@ class DevicesViewController: NSViewController {
 
         let deviceCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("device"))
         deviceCol.title = "Device"
-        deviceCol.width = 160
-        deviceCol.minWidth = 80
+        deviceCol.width = 120
+        deviceCol.minWidth = 60
         tableView.addTableColumn(deviceCol)
+
+        let uuidCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("uuid"))
+        uuidCol.title = "UUID"
+        uuidCol.width = 200
+        uuidCol.minWidth = 100
+        tableView.addTableColumn(uuidCol)
+
+        let nameCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
+        nameCol.title = "Name"
+        nameCol.width = 110
+        nameCol.minWidth = 60
+        tableView.addTableColumn(nameCol)
 
         let typeCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("type"))
         typeCol.title = "Type"
-        typeCol.width = 120
-        typeCol.minWidth = 80
+        typeCol.width = 90
+        typeCol.minWidth = 60
         tableView.addTableColumn(typeCol)
 
         let statusCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("status"))
         statusCol.title = "Status"
-        statusCol.width = 100
-        statusCol.minWidth = 60
+        statusCol.width = 80
+        statusCol.minWidth = 50
         tableView.addTableColumn(statusCol)
 
         let notifCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("notifications"))
         notifCol.title = "Notifications"
-        notifCol.width = 100
-        notifCol.minWidth = 70
+        notifCol.width = 80
+        notifCol.minWidth = 60
         tableView.addTableColumn(notifCol)
 
-        let scrollView = NSScrollView(frame: NSRect(x: p, y: p, width: w - 2 * p, height: h - 2 * p))
+        let buttonH: CGFloat = 22
+        let gap: CGFloat = 8
+
+        rescanButton = NSButton(title: "Rescan", target: self, action: #selector(rescanDevices))
+        rescanButton.bezelStyle = .rounded
+        rescanButton.frame = NSRect(x: p, y: p, width: 90, height: buttonH)
+        rescanButton.autoresizingMask = [.maxYMargin]
+        view.addSubview(rescanButton)
+
+        let scrollY = p + buttonH + gap
+        let scrollView = NSScrollView(
+            frame: NSRect(x: p, y: scrollY, width: w - 2 * p, height: h - p - scrollY))
         scrollView.documentView = tableView
         scrollView.hasVerticalScroller = true
         scrollView.autohidesScrollers = true
@@ -339,6 +380,7 @@ class DevicesViewController: NSViewController {
     override func viewWillAppear() {
         super.viewWillAppear()
         tableView.reloadData()
+        rescanButton.isEnabled = !(sensorManager?.isScanning ?? false)
     }
 
     deinit {
@@ -347,6 +389,11 @@ class DevicesViewController: NSViewController {
 
     @objc private func handleSensorUpdate() {
         tableView.reloadData()
+        rescanButton.isEnabled = !(sensorManager?.isScanning ?? false)
+    }
+
+    @objc private func rescanDevices() {
+        sensorManager?.rescan()
     }
 
     private static let relativeFormatter: RelativeDateTimeFormatter = {
@@ -359,6 +406,12 @@ class DevicesViewController: NSViewController {
         guard device.reading != nil, let date = device.lastUpdated else { return "Searching\u{2026}" }
         return Self.relativeFormatter.localizedString(for: date, relativeTo: Date())
     }
+}
+
+// MARK: - DeviceNameTextField
+
+private class DeviceNameTextField: NSTextField {
+    var deviceId: UUID?
 }
 
 // MARK: - NSTableViewDataSource
@@ -420,6 +473,27 @@ extension DevicesViewController: NSTableViewDelegate {
             return btn
         }
 
+        if colId.rawValue == "name" {
+            let cellId = NSUserInterfaceItemIdentifier("cell-name")
+            let field: DeviceNameTextField
+            if let existing = tableView.makeView(withIdentifier: cellId, owner: nil) as? DeviceNameTextField {
+                field = existing
+            }
+            else {
+                field = DeviceNameTextField()
+                field.identifier = cellId
+                field.isBordered = false
+                field.drawsBackground = false
+                field.lineBreakMode = .byTruncatingTail
+                field.font = .systemFont(ofSize: 11)
+                field.delegate = self
+            }
+            field.deviceId = device.device.id
+            field.stringValue = DeviceNamePreferences.name(for: device.device.id) ?? ""
+            field.placeholderString = device.reading?.name ?? device.device.name
+            return field
+        }
+
         let cellId = NSUserInterfaceItemIdentifier("cell-\(colId.rawValue)")
         let cell: NSTextField
         if let existing = tableView.makeView(withIdentifier: cellId, owner: nil) as? NSTextField {
@@ -436,6 +510,9 @@ extension DevicesViewController: NSTableViewDelegate {
             case "device":
                 cell.stringValue = device.reading?.name ?? device.device.name
                 cell.textColor = .labelColor
+            case "uuid":
+                cell.stringValue = device.device.id.uuidString
+                cell.textColor = .secondaryLabelColor
             case "type":
                 cell.stringValue = device.reading?.deviceType.name ?? "\u{2014}"
                 cell.textColor = device.reading != nil ? .labelColor : .secondaryLabelColor
@@ -452,5 +529,16 @@ extension DevicesViewController: NSTableViewDelegate {
         let row = tableView.row(for: sender)
         guard row >= 0, let devices = sensorManager?.sortedDevices, row < devices.count else { return }
         NotificationPreferences.setEnabled(sender.state == .on, for: devices[row].device.id)
+    }
+}
+
+// MARK: - NSTextFieldDelegate
+
+extension DevicesViewController: NSTextFieldDelegate {
+    func controlTextDidEndEditing(_ obj: Notification) {
+        guard let field = obj.object as? DeviceNameTextField,
+            let deviceId = field.deviceId
+        else { return }
+        DeviceNamePreferences.setName(field.stringValue, for: deviceId)
     }
 }

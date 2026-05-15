@@ -34,7 +34,10 @@ class SensorDeviceView: NSView {
     // MARK: - Configuration
 
     func configure(device: AranetDevice, reading: AranetReading?, lastUpdated: Date? = nil) {
-        nameLabel.stringValue = reading?.name ?? device.name
+        nameLabel.stringValue =
+            DeviceNamePreferences.name(for: device.id)
+            ?? reading?.name
+            ?? device.name
 
         let batteryWidth: CGFloat = 56
         batteryView.frame = NSRect(
