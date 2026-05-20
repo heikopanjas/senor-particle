@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2026-03-22
+**Last updated:** 2026-05-20
 
 <!-- {mission} -->
 
@@ -90,10 +90,13 @@ When initializing a session or analyzing the workspace, refer to instruction fil
   - Use `AranetClient` for device discovery and data retrieval
   - Leverage async/await API provided by AranetKit
   - No manual CoreBluetooth management needed - handled by AranetKit
+  - UI updates react to `Notification.Name.aranetReadingDidUpdate` from AranetKit (not app-local sensor notifications)
 - **UI Updates**: Use Swift concurrency (async/await) for sensor data updates to keep UI responsive
 - **Background Operation**: Design for efficient background monitoring with minimal resource usage
 - **Periodic Updates**: Schedule readings based on device update intervals (AranetKit provides timing info)
 - **Error Handling**: Provide clear user feedback for Bluetooth connectivity and sensor communication issues
+- **Status Notifications**: Use `StatusNotificationCopy` for Carrot Weather-inspired notification text on status color transitions. Four configurable personality levels (`NotificationPersonality`: Professional, Friendly, Snarky, Overkill) in Settings. Copy is data-first (metric + plain-language severity), device-type aware (CO₂, radiation, radon), and direction-aware (worsening vs improving). Stored in Swift static tables in `StatusNotificationCopy.swift`
+- **Update Cycle Progress**: Each sensor in the menu shows an `UpdateCycleProgressView` below the timestamp. Cycle position = `reading.ago at receive + time since lastUpdated`, repeating every interval via modulo while the menu stays open. Fill color fades from light green opaque to light green at 37% opacity. New readings re-anchor via `MonitoredDevice.updateSequence`. After a configurable number of missed intervals without a reading (**Degraded situation**, default 3, Settings > General), the bar shows full opaque dark red. UI refresh during menu tracking uses `MenuTrackingRefresh` (`.common` run loop); reading delivery relies on AranetKit monitor timers and `Notification.Name.aranetReadingDidUpdate`
 
 ### Security & Safety
 
@@ -1716,3 +1719,14 @@ After making ANY code changes:
 ### 2026-03-22
 
 - **Switched aranet-kit to published version**: Changed SPM dependency from branch-based (develop) to version-based (upToNextMajorVersion from 3.2.0) now that the package is published on GitHub with tagged releases
+
+### 2026-05-20
+
+- **Carrot-inspired notification copy**: Replaced generic GREEN/YELLOW/RED transition messages with data-first, personality-configurable copy in `StatusNotificationCopy.swift`. Added `NotificationPersonality` enum (Professional, Friendly, Snarky, Overkill) with Settings picker in General tab. Notifications use custom device display names and include live metric values from `AranetReading`
+- **Removed Homicidal personality**: Dropped homicidal notification tone level; four personalities remain
+- **Update cycle progress bar**: Added `UpdateCycleProgressView` below each sensor in the menu dropdown. Shows elapsed fraction of the device update interval with live color shift from green to red; uses `reading.ago`, `reading.interval`, and `lastUpdated`
+- **Live menu updates**: Progress bar timer uses `RunLoop.main` `.common` mode for updates while menu is tracked; `MenuManager` refreshes sensor views in place instead of rebuilding menu items on each reading
+- **Progress bar states**: Green fade cycles every interval while menu is open; dark red full after three missed intervals
+- **Menu tracking UI refresh**: Added `MenuTrackingRefresh` to schedule status bar and menu view updates on `RunLoop.main` `.common` mode. `MenuManager` observes `Notification.Name.aranetReadingDidUpdate` and forces view redraw after in-place configure so sensor values update while the menu is open
+- **In-place menu row updates**: `SensorDeviceView` reuses persistent metric row fields instead of removing and recreating subviews on each reading; AppKit does not repaint rebuilt subviews during menu tracking. `MenuManager` reassigns `NSMenuItem.view` after updates to force menu item redraw
+- **Menu-open sensor polling**: Root cause of stale menu/status values while menu open is AranetKit monitor timers using default run loop mode (paused during menu tracking). Fixed upstream in AranetKit; app listens to `Notification.Name.aranetReadingDidUpdate` only

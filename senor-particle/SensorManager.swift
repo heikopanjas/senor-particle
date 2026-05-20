@@ -2,7 +2,6 @@ import AranetKit
 import Foundation
 
 extension Notification.Name {
-    static let aranetSensorDidUpdate = Notification.Name("aranetSensorDidUpdate")
     static let aranetScanStateDidChange = Notification.Name("aranetScanStateDidChange")
 }
 
@@ -10,6 +9,7 @@ struct MonitoredDevice {
     let device: AranetDevice
     var reading: AranetReading?
     var lastUpdated: Date?
+    var updateSequence: UInt = 0
 }
 
 class SensorManager {
@@ -24,7 +24,18 @@ class SensorManager {
     private let maxRetries = 5
     private let baseRetryDelay: TimeInterval = 5
 
-    var onUpdate: (() -> Void)?
+    init() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleReadingDidUpdate),
+            name: .aranetReadingDidUpdate,
+            object: nil
+        )
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
 
     func scan() async throws {
         isScanning = true
@@ -33,7 +44,6 @@ class SensorManager {
         let timeout = UserDefaults.standard.double(forKey: "scanTimeout")
         let found = try await client.scan(timeout: timeout > 0 ? timeout : 15.0)
         for device in found where devices[device.id] == nil { devices[device.id] = MonitoredDevice(device: device) }
-        onUpdate?()
     }
 
     func rescan() {
@@ -64,6 +74,22 @@ class SensorManager {
 
     // MARK: - Private
 
+    @objc private func handleReadingDidUpdate(_ notification: Notification) {
+        guard let device = notification.userInfo?[AranetNotificationKey.device] as? AranetDevice,
+            let reading = notification.userInfo?[AranetNotificationKey.reading] as? AranetReading
+        else { return }
+
+        let receivedAt = notification.userInfo?[AranetNotificationKey.receivedAt] as? Date ?? Date()
+
+        if devices[device.id] == nil {
+            devices[device.id] = MonitoredDevice(device: device)
+        }
+
+        devices[device.id]?.reading = reading
+        devices[device.id]?.lastUpdated = receivedAt
+        devices[device.id]?.updateSequence &+= 1
+    }
+
     private func monitorWithRetry(id: UUID, device: AranetDevice) async {
         var retryCount = 0
 
@@ -73,12 +99,8 @@ class SensorManager {
             for await result in stream {
                 if Task.isCancelled { return }
 
-                switch result { case .success(let reading):
-                    retryCount = 0
-                    devices[id]?.reading = reading
-                    devices[id]?.lastUpdated = Date()
-                    onUpdate?()
-                    NotificationCenter.default.post(name: .aranetSensorDidUpdate, object: self)
+                switch result {
+                    case .success: break
                     case .failure: break
                 }
             }

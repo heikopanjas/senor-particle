@@ -2,17 +2,24 @@ import AranetKit
 import Cocoa
 
 class SensorDeviceView: NSView {
+    private struct MetricRow {
+        let labelField: NSTextField
+        let valueField: NSTextField
+    }
+
     private let iconBackgroundView = NSView()
     private let iconView = NSImageView()
     private let nameLabel = NSTextField()
     private let batteryView = BatteryView()
-    private var rowLabels: [NSTextField] = []
-    private var rowValues: [NSTextField] = []
+    private let timestampField = NSTextField()
+    private let updateCycleProgress = UpdateCycleProgressView()
+    private var metricRows: [MetricRow] = []
 
     override var isFlipped: Bool { true }
 
     private let badgeSize: CGFloat = 24
-    private let iconSize: CGFloat = 14
+    private let iconViewSize: CGFloat = 16
+    private let iconSymbolPointSize: CGFloat = 12
     private let leftPadding: CGFloat = 12
     private let contentLeft: CGFloat = 42
     private let rightPadding: CGFloat = 14
@@ -23,6 +30,8 @@ class SensorDeviceView: NSView {
     private let rowHeight: CGFloat = 16
     private let rowSpacing: CGFloat = 1
     private let labelWidth: CGFloat = 90
+    private let progressHeight: CGFloat = 2
+    private let progressTopGap: CGFloat = 6
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -33,7 +42,7 @@ class SensorDeviceView: NSView {
 
     // MARK: - Configuration
 
-    func configure(device: AranetDevice, reading: AranetReading?, lastUpdated: Date? = nil) {
+    func configure(device: AranetDevice, reading: AranetReading?, lastUpdated: Date? = nil, updateSequence: UInt = 0) {
         nameLabel.stringValue =
             DeviceNamePreferences.name(for: device.id)
             ?? reading?.name
@@ -47,72 +56,85 @@ class SensorDeviceView: NSView {
             x: contentLeft, y: topPadding, width: frame.width - contentLeft - rightPadding - batteryWidth - 4,
             height: nameRowHeight)
 
-        let status = effectiveStatus(from: reading)
+        let status = SensorSymbol.effectiveStatus(from: reading)
 
         if let reading {
-            iconView.image = iconForDeviceType(reading.deviceType)
+            iconView.image = SensorSymbol.image(for: reading.deviceType, status: status, pointSize: iconSymbolPointSize)
             iconView.contentTintColor = .white
             iconBackgroundView.layer?.backgroundColor = backgroundForStatus(status).cgColor
             batteryView.configure(battery: Int(reading.battery))
         }
         else {
-            iconView.image = NSImage(
-                systemSymbolName: "dot.radiowaves.left.and.right", accessibilityDescription: "sensor")
+            iconView.image = SensorSymbol.scanningImage(pointSize: iconSymbolPointSize, weight: .semibold)
             iconView.contentTintColor = .white
             iconBackgroundView.layer?.backgroundColor = NSColor.tertiaryLabelColor.cgColor
             batteryView.clear()
         }
 
-        for label in rowLabels { label.removeFromSuperview() }
-        for value in rowValues { value.removeFromSuperview() }
-        rowLabels.removeAll()
-        rowValues.removeAll()
-
         let rows = readingRows(from: reading)
+        ensureMetricRows(count: rows.count)
+
         let valueX = contentLeft + labelWidth
         let valueWidth = frame.width - valueX - rightPadding
-
         var y = topPadding + nameRowHeight + nameBottomGap
 
-        for row in rows {
-            let labelField = makeLabel(size: 12, weight: .regular)
-            labelField.stringValue = row.label
-            labelField.textColor = .secondaryLabelColor
-            labelField.frame = NSRect(x: contentLeft, y: y, width: labelWidth, height: rowHeight)
-            addSubview(labelField)
-            rowLabels.append(labelField)
-
-            let valueField = makeLabel(size: 12, weight: .medium)
-            valueField.stringValue = row.value
-            valueField.textColor = .labelColor
-            valueField.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
-            valueField.frame = NSRect(x: valueX, y: y, width: valueWidth, height: rowHeight)
-            addSubview(valueField)
-            rowValues.append(valueField)
-
+        for (index, row) in rows.enumerated() {
+            let metricRow = metricRows[index]
+            metricRow.labelField.stringValue = row.label
+            metricRow.valueField.stringValue = row.value
+            metricRow.labelField.frame = NSRect(x: contentLeft, y: y, width: labelWidth, height: rowHeight)
+            metricRow.valueField.frame = NSRect(x: valueX, y: y, width: valueWidth, height: rowHeight)
+            metricRow.labelField.isHidden = false
+            metricRow.valueField.isHidden = false
             y += rowHeight + rowSpacing
         }
 
-        if let lastUpdated, reading != nil {
+        for index in rows.count ..< metricRows.count {
+            metricRows[index].labelField.isHidden = true
+            metricRows[index].valueField.isHidden = true
+        }
+
+        if let lastUpdated, let reading {
             y += 2
-            let ageField = makeLabel(size: 10, weight: .regular)
-            ageField.textColor = .secondaryLabelColor
-            ageField.stringValue = formatTimestamp(lastUpdated)
-            ageField.frame = NSRect(x: contentLeft, y: y, width: frame.width - contentLeft - rightPadding, height: 14)
-            addSubview(ageField)
-            rowLabels.append(ageField)
+            timestampField.stringValue = formatTimestamp(sensorMeasurementDate(receivedAt: lastUpdated, reading: reading))
+            timestampField.frame = NSRect(x: contentLeft, y: y, width: frame.width - contentLeft - rightPadding, height: 14)
+            timestampField.isHidden = false
             y += 14
+
+            y += progressTopGap
+            let progressWidth = frame.width - contentLeft - rightPadding
+            updateCycleProgress.frame = NSRect(x: contentLeft, y: y, width: progressWidth, height: progressHeight)
+            updateCycleProgress.configure(
+                lastUpdated: lastUpdated, reading: reading, updateSequence: updateSequence)
+            y += progressHeight
+        }
+        else {
+            timestampField.isHidden = true
+            updateCycleProgress.clear()
         }
 
         let totalHeight = y - rowSpacing + bottomPadding
         setFrameSize(NSSize(width: frame.width, height: totalHeight))
 
         let badgeY = topPadding + (nameRowHeight - badgeSize) / 2
-        iconBackgroundView.frame = NSRect(x: leftPadding, y: badgeY, width: badgeSize, height: badgeSize)
+        layoutIconBadge(at: badgeY, deviceType: reading?.deviceType)
+
+        invalidateDisplay()
+    }
+
+    private func layoutIconBadge(at badgeY: CGFloat, deviceType: AranetDeviceType?) {
+        let badgeFrame = NSRect(x: leftPadding, y: badgeY, width: badgeSize, height: badgeSize)
+        iconBackgroundView.frame = badgeFrame
         iconBackgroundView.layer?.cornerRadius = badgeSize / 2
 
-        let iconInset = (badgeSize - iconSize) / 2
-        iconView.frame = NSRect(x: leftPadding + iconInset, y: badgeY + iconInset, width: iconSize, height: iconSize)
+        let iconInset = (badgeSize - iconViewSize) / 2
+        let offset = deviceType.map { SensorSymbol.alignmentOffset(for: $0) } ?? .zero
+        iconView.frame = NSRect(
+            x: badgeFrame.minX + iconInset + offset.width,
+            y: badgeFrame.minY + iconInset + offset.height,
+            width: iconViewSize,
+            height: iconViewSize
+        )
     }
 
     // MARK: - Setup
@@ -122,13 +144,21 @@ class SensorDeviceView: NSView {
         iconBackgroundView.layer?.masksToBounds = true
         addSubview(iconBackgroundView)
 
-        iconView.imageScaling = .scaleProportionallyUpOrDown
+        iconView.imageScaling = .scaleProportionallyDown
+        iconView.imageAlignment = .alignCenter
         addSubview(iconView)
 
         configureLabel(nameLabel, size: 13, weight: .semibold)
         addSubview(nameLabel)
 
         addSubview(batteryView)
+
+        configureLabel(timestampField, size: 10, weight: .regular)
+        timestampField.textColor = .secondaryLabelColor
+        timestampField.isHidden = true
+        addSubview(timestampField)
+
+        addSubview(updateCycleProgress)
     }
 
     private func configureLabel(_ label: NSTextField, size: CGFloat, weight: NSFont.Weight) {
@@ -146,6 +176,41 @@ class SensorDeviceView: NSView {
         return label
     }
 
+    private func ensureMetricRows(count: Int) {
+        let valueX = contentLeft + labelWidth
+        let valueWidth = frame.width - valueX - rightPadding
+
+        while metricRows.count < count {
+            let labelField = makeLabel(size: 12, weight: .regular)
+            labelField.textColor = .secondaryLabelColor
+
+            let valueField = makeLabel(size: 12, weight: .medium)
+            valueField.textColor = .labelColor
+            valueField.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+
+            addSubview(labelField)
+            addSubview(valueField)
+            metricRows.append(MetricRow(labelField: labelField, valueField: valueField))
+        }
+
+        for metricRow in metricRows {
+            metricRow.valueField.frame.size.width = valueWidth
+        }
+    }
+
+    private func invalidateDisplay() {
+        needsDisplay = true
+        displayIfNeeded()
+
+        for metricRow in metricRows {
+            metricRow.labelField.needsDisplay = true
+            metricRow.valueField.needsDisplay = true
+        }
+        timestampField.needsDisplay = true
+        nameLabel.needsDisplay = true
+        batteryView.needsDisplay = true
+    }
+
     // MARK: - Reading Rows
 
     private struct ReadingRow {
@@ -154,7 +219,7 @@ class SensorDeviceView: NSView {
     }
 
     private func readingRows(from reading: AranetReading?) -> [ReadingRow] {
-        guard let reading else { return [ReadingRow(label: "", value: "Connecting\u{2026}")] }
+        guard let reading else { return [] }
 
         var rows: [ReadingRow] = []
 
@@ -186,31 +251,12 @@ class SensorDeviceView: NSView {
 
     private func formatTimestamp(_ date: Date) -> String { return Self.timestampFormatter.string(from: date) }
 
-    // MARK: - Status
-
-    /// Returns a status color for the device. Aranet4, Aranet Radiation, and
-    /// Aranet Radon provide native status via AranetKit; Aranet2 defaults to green.
-    private func effectiveStatus(from reading: AranetReading?) -> AranetStatusColor? {
-        guard let reading else { return nil }
-        if let status = reading.status { return status }
-        if reading.temperature != nil || reading.humidity != nil { return .green }
-        return nil
+    /// When the sensor recorded the reading, derived from app receive time minus device-reported age.
+    private func sensorMeasurementDate(receivedAt: Date, reading: AranetReading) -> Date {
+        receivedAt.addingTimeInterval(-TimeInterval(reading.ago ?? 0))
     }
 
     // MARK: - Appearance
-
-    private func iconForDeviceType(_ type: AranetDeviceType) -> NSImage? {
-        let name: String
-        switch type {
-            case .aranet4: name = "wind"
-            case .aranet2: name = "thermometer.medium"
-            case .aranetRadiation: name = "atom"
-            case .aranetRadon: name = "humidity.fill"
-            case .unknown: name = "dot.radiowaves.left.and.right"
-        }
-        let config = NSImage.SymbolConfiguration(pointSize: iconSize, weight: .bold)
-        return NSImage(systemSymbolName: name, accessibilityDescription: type.name)?.withSymbolConfiguration(config)
-    }
 
     private func backgroundForStatus(_ status: AranetStatusColor?) -> NSColor {
         switch status {

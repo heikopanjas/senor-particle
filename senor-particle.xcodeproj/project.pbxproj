@@ -101,7 +101,7 @@
 			mainGroup = 428A103E2EFAC80A00825D79;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				42AA10602EFBC80A00825D79 /* XCRemoteSwiftPackageReference "aranet-kit" */,
+				42AA10602EFBC80A00825D79 /* XCLocalSwiftPackageReference "aranet-kit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 428A10482EFAC80A00825D79 /* Products */;
@@ -361,21 +361,17 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		42AA10602EFBC80A00825D79 /* XCRemoteSwiftPackageReference "aranet-kit" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/heikopanjas/aranet-kit.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 3.2.0;
-			};
+/* Begin XCLocalSwiftPackageReference section */
+		42AA10602EFBC80A00825D79 /* XCLocalSwiftPackageReference "aranet-kit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../aranet-kit;
 		};
-/* End XCRemoteSwiftPackageReference section */
+/* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		42AA10612EFBC80A00825D79 /* AranetKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 42AA10602EFBC80A00825D79 /* XCRemoteSwiftPackageReference "aranet-kit" */;
+			package = 42AA10602EFBC80A00825D79 /* XCLocalSwiftPackageReference "aranet-kit" */;
 			productName = AranetKit;
 		};
 /* End XCSwiftPackageProductDependency section */

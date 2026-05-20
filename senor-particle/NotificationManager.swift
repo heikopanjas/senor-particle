@@ -15,8 +15,8 @@ class NotificationManager {
 
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(handleSensorUpdate),
-            name: .aranetSensorDidUpdate,
+            selector: #selector(handleReadingDidUpdate),
+            name: .aranetReadingDidUpdate,
             object: nil
         )
     }
@@ -27,7 +27,7 @@ class NotificationManager {
 
     // MARK: - Private
 
-    @objc private func handleSensorUpdate() {
+    @objc private func handleReadingDidUpdate() {
         guard let devices = sensorManager?.sortedDevices else { return }
 
         for device in devices {
@@ -43,21 +43,31 @@ class NotificationManager {
             }
 
             if let previous = previousStatuses[id], previous != newStatus {
-                deliver(
-                    deviceName: reading.name,
-                    from: previous,
-                    to: newStatus
-                )
+                deliver(reading: reading, deviceId: id, from: previous, to: newStatus)
             }
 
             previousStatuses[id] = newStatus
         }
     }
 
-    private func deliver(deviceName: String, from previous: AranetStatusColor, to current: AranetStatusColor) {
+    private func deliver(
+        reading: AranetReading,
+        deviceId: UUID,
+        from previous: AranetStatusColor,
+        to current: AranetStatusColor
+    ) {
+        guard
+            let notification = StatusNotificationCopy.content(
+                for: reading,
+                deviceId: deviceId,
+                from: previous,
+                to: current
+            )
+        else { return }
+
         let content = UNMutableNotificationContent()
-        content.title = deviceName
-        content.body = messageBody(from: previous, to: current)
+        content.title = notification.title
+        content.body = notification.body
         content.sound = .default
 
         let request = UNNotificationRequest(
@@ -68,28 +78,6 @@ class NotificationManager {
 
         UNUserNotificationCenter.current().add(request) { error in
             if let error { NSLog("[NotificationManager] Failed to post notification: %@", error.localizedDescription) }
-        }
-    }
-
-    private func messageBody(from previous: AranetStatusColor, to current: AranetStatusColor) -> String {
-        let base = "Just went from \(previous.displayName) to \(current.displayName)."
-        switch current {
-            case .red: return base + " Take action immediately."
-            case .yellow: return base + " Consider ventilating."
-            default: return base
-        }
-    }
-}
-
-// MARK: - AranetStatusColor display name
-
-extension AranetStatusColor {
-    var displayName: String {
-        switch self {
-            case .green: return "GREEN"
-            case .yellow: return "YELLOW"
-            case .red: return "RED"
-            default: return "UNKNOWN"
         }
     }
 }

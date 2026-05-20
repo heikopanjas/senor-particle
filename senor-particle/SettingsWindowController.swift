@@ -2,6 +2,26 @@ import AranetKit
 import Cocoa
 import ServiceManagement
 
+// MARK: - Degraded situation preferences
+
+enum DegradedSituationPreferences {
+    static let key = "degradedSituationCycles"
+    static let defaultCycles = 3
+    static let minimumCycles = 1
+    static let maximumCycles = 10
+
+    static var cycles: Int {
+        get {
+            let stored = UserDefaults.standard.integer(forKey: key)
+            if stored < minimumCycles { return defaultCycles }
+            return min(stored, maximumCycles)
+        }
+        set {
+            UserDefaults.standard.set(min(max(newValue, minimumCycles), maximumCycles), forKey: key)
+        }
+    }
+}
+
 // MARK: - Notification preferences
 
 enum NotificationPreferences {
@@ -152,6 +172,9 @@ extension SettingsWindowController: NSToolbarDelegate {
 class GeneralViewController: NSViewController {
     private weak var sensorManager: SensorManager?
     private var loginToggle: NSButton!
+    private var personalityPopup: NSPopUpButton!
+    private var degradedLabel: NSTextField!
+    private var degradedSlider: NSSlider!
     private var timeoutLabel: NSTextField!
     private var timeoutSlider: NSSlider!
     private var rescanButton: NSButton!
@@ -159,7 +182,7 @@ class GeneralViewController: NSViewController {
     private let defaultTimeout: Double = 15
 
     override var preferredContentSize: NSSize {
-        get { isViewLoaded ? view.bounds.size : NSSize(width: 420, height: 300) }
+        get { isViewLoaded ? view.bounds.size : NSSize(width: 420, height: 382) }
         set {}
     }
 
@@ -172,7 +195,7 @@ class GeneralViewController: NSViewController {
 
     override func loadView() {
         let w: CGFloat = 420
-        let h: CGFloat = 300
+        let h: CGFloat = 382
         let x: CGFloat = 20
         let controlW = w - 2 * x
         var y = h - 20 - 22
@@ -183,6 +206,42 @@ class GeneralViewController: NSViewController {
         loginToggle.frame = NSRect(x: x, y: y, width: controlW, height: 22)
         loginToggle.autoresizingMask = [.minYMargin, .width]
         view.addSubview(loginToggle)
+
+        y -= 16 + 16
+        let personalityLabel = NSTextField(labelWithString: "Notification Personality")
+        personalityLabel.frame = NSRect(x: x, y: y, width: controlW, height: 16)
+        personalityLabel.autoresizingMask = [.minYMargin, .width]
+        view.addSubview(personalityLabel)
+
+        y -= 4 + 26
+        personalityPopup = NSPopUpButton(frame: NSRect(x: x, y: y, width: controlW, height: 26), pullsDown: false)
+        personalityPopup.autoresizingMask = [.minYMargin, .width]
+        for personality in NotificationPersonality.allCases {
+            personalityPopup.addItem(withTitle: personality.displayName)
+        }
+        personalityPopup.target = self
+        personalityPopup.action = #selector(personalityChanged(_:))
+        view.addSubview(personalityPopup)
+
+        y -= 16 + 16
+        degradedLabel = NSTextField(labelWithString: "")
+        degradedLabel.frame = NSRect(x: x, y: y, width: controlW, height: 16)
+        degradedLabel.autoresizingMask = [.minYMargin, .width]
+        view.addSubview(degradedLabel)
+
+        y -= 4 + 22
+        degradedSlider = NSSlider(
+            value: Double(DegradedSituationPreferences.defaultCycles),
+            minValue: Double(DegradedSituationPreferences.minimumCycles),
+            maxValue: Double(DegradedSituationPreferences.maximumCycles),
+            target: self,
+            action: #selector(degradedSliderChanged(_:))
+        )
+        degradedSlider.numberOfTickMarks = DegradedSituationPreferences.maximumCycles
+        degradedSlider.allowsTickMarkValuesOnly = true
+        degradedSlider.frame = NSRect(x: x, y: y, width: controlW, height: 22)
+        degradedSlider.autoresizingMask = [.minYMargin, .width]
+        view.addSubview(degradedSlider)
 
         y -= 16 + 16
         timeoutLabel = NSTextField(labelWithString: "")
@@ -225,7 +284,16 @@ class GeneralViewController: NSViewController {
         timeoutSlider.doubleValue = timeout
         updateTimeoutLabel(seconds: timeout)
 
+        let cycles = DegradedSituationPreferences.cycles
+        degradedSlider.doubleValue = Double(cycles)
+        updateDegradedLabel(cycles: cycles)
+
         rescanButton.isEnabled = !(sensorManager?.isScanning ?? false)
+
+        let personality = NotificationPersonalityPreferences.current
+        if let index = NotificationPersonality.allCases.firstIndex(of: personality) {
+            personalityPopup.selectItem(at: index)
+        }
     }
 
     deinit {
@@ -233,6 +301,12 @@ class GeneralViewController: NSViewController {
     }
 
     // MARK: - Actions
+
+    @objc private func personalityChanged(_ sender: NSPopUpButton) {
+        let index = sender.indexOfSelectedItem
+        guard NotificationPersonality.allCases.indices.contains(index) else { return }
+        NotificationPersonalityPreferences.current = NotificationPersonality.allCases[index]
+    }
 
     @objc private func toggleLogin(_ sender: NSButton) {
         let enable = sender.state == .on
@@ -256,6 +330,12 @@ class GeneralViewController: NSViewController {
         updateTimeoutLabel(seconds: value)
     }
 
+    @objc private func degradedSliderChanged(_ sender: NSSlider) {
+        let cycles = Int(sender.doubleValue.rounded())
+        DegradedSituationPreferences.cycles = cycles
+        updateDegradedLabel(cycles: cycles)
+    }
+
     @objc private func rescanDevices() {
         sensorManager?.rescan()
     }
@@ -268,6 +348,10 @@ class GeneralViewController: NSViewController {
 
     private func updateTimeoutLabel(seconds: Double) {
         timeoutLabel.stringValue = "Scan timeout: \(Int(seconds))s"
+    }
+
+    private func updateDegradedLabel(cycles: Int) {
+        degradedLabel.stringValue = "Degraded situation: \(cycles) missed update cycles"
     }
 }
 
@@ -365,13 +449,13 @@ class DevicesViewController: NSViewController {
         super.viewDidLoad()
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(handleSensorUpdate),
-            name: .aranetSensorDidUpdate,
+            selector: #selector(handleReadingDidUpdate),
+            name: .aranetReadingDidUpdate,
             object: nil
         )
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(handleSensorUpdate),
+            selector: #selector(handleScanStateChange),
             name: .aranetScanStateDidChange,
             object: nil
         )
@@ -387,9 +471,13 @@ class DevicesViewController: NSViewController {
         NotificationCenter.default.removeObserver(self)
     }
 
-    @objc private func handleSensorUpdate() {
+    @objc private func handleReadingDidUpdate() {
         tableView.reloadData()
+    }
+
+    @objc private func handleScanStateChange() {
         rescanButton.isEnabled = !(sensorManager?.isScanning ?? false)
+        tableView.reloadData()
     }
 
     @objc private func rescanDevices() {
