@@ -7,18 +7,15 @@ import Cocoa
     private var menuManager: MenuManager?
     private var notificationManager: NotificationManager?
     private let statusItemDisplayView = StatusItemDisplayView()
+    private let statusItemPlaceholderView = StatusItemPlaceholderView()
 
     func applicationDidFinishLaunching(_ aNotification: Notification) -> Void {
         let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.statusItem = statusItem
 
-        statusItem.button?.title = " \u{2026}"
-        statusItem.button?.imagePosition = .imageLeading
-        statusItem.button?.image = self.statusBarPlaceholderSymbol()
-        statusItem.button?.font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-
         let menu = NSMenu()
         statusItem.menu = menu
+        self.setStatusBarPlaceholder()
 
         let sensorManager = SensorManager()
         self.sensorManager = sensorManager
@@ -81,8 +78,11 @@ import Cocoa
         if self.sensorManager?.isScanning == true {
             self.setStatusBarPlaceholder()
         }
-        else if self.sensorManager?.sortedDevices.first(where: { $0.reading != nil }) == nil {
-            self.setStatusBarPlaceholder()
+        else {
+            MenuTrackingRefresh.perform { [weak self] in
+                self?.updateStatusBar()
+                self?.menuManager?.refreshIfNeeded()
+            }
         }
     }
 
@@ -123,18 +123,6 @@ import Cocoa
         self.applyStatusBarValues(StatusBarDisplayPreferences.defaultValueStrings(for: reading), label: self.compactStatusLabel(for: reading))
     }
 
-    private func applyStatusBarTitle(_ title: String) -> Void {
-        guard let statusItem = self.statusItem else { return }
-
-        self.removeStatusItemDisplayView()
-        statusItem.button?.title = title
-        statusItem.button?.image = nil
-        statusItem.length = NSStatusItem.variableLength
-        statusItem.button?.needsDisplay = true
-        statusItem.button?.displayIfNeeded()
-        statusItem.button?.window?.displayIfNeeded()
-    }
-
     private func applyStatusBarValues(_ values: [String], label: String) -> Void {
         switch values.count {
             case 1, 2:
@@ -151,6 +139,7 @@ import Cocoa
         let width = StatusItemDisplayView.requiredWidth(for: displayValue)
         let height = button.bounds.height > 0 ? button.bounds.height : NSStatusBar.system.thickness
 
+        self.removeStatusItemPlaceholderView()
         statusItem.length = width
         button.title = ""
         button.image = nil
@@ -173,24 +162,35 @@ import Cocoa
     }
 
     private func setStatusBarPlaceholder() -> Void {
-        guard let statusItem = self.statusItem else { return }
+        guard let statusItem = self.statusItem, let button = statusItem.button else { return }
+
+        let width = StatusItemPlaceholderView.requiredWidth()
+        let height = button.bounds.height > 0 ? button.bounds.height : NSStatusBar.system.thickness
 
         self.removeStatusItemDisplayView()
-        statusItem.button?.title = " \u{2026}"
-        statusItem.button?.image = self.statusBarPlaceholderSymbol()
-        statusItem.length = NSStatusItem.variableLength
-        statusItem.button?.needsDisplay = true
-        statusItem.button?.displayIfNeeded()
-        statusItem.button?.window?.displayIfNeeded()
+        statusItem.length = width
+        button.title = ""
+        button.image = nil
+
+        if self.statusItemPlaceholderView.superview !== button {
+            self.statusItemPlaceholderView.removeFromSuperview()
+            button.addSubview(self.statusItemPlaceholderView)
+        }
+
+        self.statusItemPlaceholderView.frame = NSRect(x: 0, y: 0, width: width, height: height)
+        self.statusItemPlaceholderView.autoresizingMask = [.height]
+        self.statusItemPlaceholderView.startAnimating()
+        button.needsDisplay = true
+        button.displayIfNeeded()
+        button.window?.displayIfNeeded()
     }
 
     private func removeStatusItemDisplayView() -> Void {
         self.statusItemDisplayView.removeFromSuperview()
     }
 
-    private func statusBarPlaceholderSymbol() -> NSImage? {
-        guard let image = SensorSymbol.scanningImage(pointSize: 16, weight: .semibold) else { return nil }
-        image.isTemplate = true
-        return image
+    private func removeStatusItemPlaceholderView() -> Void {
+        self.statusItemPlaceholderView.stopAnimating()
+        self.statusItemPlaceholderView.removeFromSuperview()
     }
 }

@@ -2,7 +2,7 @@ import AranetKit
 import Cocoa
 
 enum SensorSymbol {
-    static let scanningSymbolName = "sensor.tag.radiowaves.forward"
+    static let scanningSymbolName = "antenna.radiowaves.left.and.right"
 
     static func systemName(for type: AranetDeviceType, status: AranetStatusColor?) -> String {
         switch type {
