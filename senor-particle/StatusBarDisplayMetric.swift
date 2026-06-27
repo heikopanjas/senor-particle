@@ -150,6 +150,9 @@ enum StatusBarDisplayMetric: String, CaseIterable {
     case radiationTotal
     case radonConcentration
 
+    private static let milliremsPerMicrosievert = 0.1
+    private static let picocuriesPerLiterPerBecquerelPerCubicMeter = 1.0 / 37.0
+
     var label: String {
         switch self {
             case .co2: return "CO\u{2082}"
@@ -169,24 +172,57 @@ enum StatusBarDisplayMetric: String, CaseIterable {
                 return "\(co2) ppm"
             case .temperature:
                 guard let temperature = reading.temperature else { return nil }
-                return String(format: "%.1f \u{00B0}C", temperature.value)
+                switch DisplayUnitSystemPreferences.current {
+                    case .metric:
+                        let celsius = temperature.converted(to: .celsius)
+                        return String(format: "%.1f \u{00B0}C", celsius.value)
+                    case .imperial:
+                        let fahrenheit = temperature.converted(to: .fahrenheit)
+                        return String(format: "%.1f \u{00B0}F", fahrenheit.value)
+                }
             case .humidity:
                 guard let humidity = reading.humidity else { return nil }
                 return "\(humidity)%"
             case .pressure:
                 guard let pressure = reading.pressure else { return nil }
-                return String(format: "%.1f hPa", pressure.value)
+                switch DisplayUnitSystemPreferences.current {
+                    case .metric:
+                        let hectopascals = pressure.converted(to: .hectopascals)
+                        return String(format: "%.1f hPa", hectopascals.value)
+                    case .imperial:
+                        let inchesOfMercury = pressure.converted(to: .inchesOfMercury)
+                        return String(format: "%.2f inHg", inchesOfMercury.value)
+                }
             case .radiationRate:
                 guard let radiationRate = reading.radiationRate else { return nil }
                 let uSv = radiationRate.converted(to: .microsieverts)
-                return String(format: "%.3f \u{00B5}Sv/h", uSv.value)
+                switch DisplayUnitSystemPreferences.current {
+                    case .metric:
+                        return String(format: "%.3f \u{00B5}Sv/h", uSv.value)
+                    case .imperial:
+                        let millirems = uSv.value * Self.milliremsPerMicrosievert
+                        return String(format: "%.3f mrem/h", millirems)
+                }
             case .radiationTotal:
                 guard let radiationTotal = reading.radiationTotal else { return nil }
                 let uSv = radiationTotal.converted(to: .microsieverts)
-                return String(format: "%.2f \u{00B5}Sv", uSv.value)
+                switch DisplayUnitSystemPreferences.current {
+                    case .metric:
+                        return String(format: "%.2f \u{00B5}Sv", uSv.value)
+                    case .imperial:
+                        let millirems = uSv.value * Self.milliremsPerMicrosievert
+                        return String(format: "%.2f mrem", millirems)
+                }
             case .radonConcentration:
                 guard let radonConcentration = reading.radonConcentration else { return nil }
-                return String(format: "%.0f Bq/m\u{00B3}", radonConcentration.value)
+                switch DisplayUnitSystemPreferences.current {
+                    case .metric:
+                        return String(format: "%.0f Bq/m\u{00B3}", radonConcentration.value)
+                    case .imperial:
+                        let picocuriesPerLiter =
+                            radonConcentration.value * Self.picocuriesPerLiterPerBecquerelPerCubicMeter
+                        return String(format: "%.1f pCi/L", picocuriesPerLiter)
+                }
         }
     }
 

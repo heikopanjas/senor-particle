@@ -44,6 +44,12 @@ import Cocoa
             name: .statusBarDisplayPreferenceDidChange,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleDisplayUnitSystemPreferenceDidChange),
+            name: .displayUnitSystemPreferenceDidChange,
+            object: nil
+        )
 
         Task {
             do {
@@ -83,6 +89,13 @@ import Cocoa
     @objc private func handleStatusBarDisplayPreferenceDidChange() {
         MenuTrackingRefresh.perform { [weak self] in
             self?.updateStatusBar()
+        }
+    }
+
+    @objc private func handleDisplayUnitSystemPreferenceDidChange() {
+        MenuTrackingRefresh.perform { [weak self] in
+            self?.updateStatusBar()
+            self?.menuManager?.refreshIfNeeded()
         }
     }
 

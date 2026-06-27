@@ -97,8 +97,10 @@ When initializing a session or analyzing the workspace, refer to instruction fil
 - **Error Handling**: Provide clear user feedback for Bluetooth connectivity and sensor communication issues
 - **Status Notifications**: Use `StatusNotificationCopy` for Carrot Weather-inspired notification text on status color transitions. Four configurable personality levels (`NotificationPersonality`: Professional, Friendly, Snarky, Overkill) in Settings. Copy is data-first (metric + plain-language severity), device-type aware (CO₂, radiation, radon), and direction-aware (worsening vs improving). Stored in Swift static tables in `StatusNotificationCopy.swift`
 - **Status Item Display Selection**: The macOS menu bar status item can be pinned to one or two device metrics from Settings > Devices. Store one selected device UUID and up to two ordered `StatusBarDisplayMetric` values in `StatusBarDisplayPreferences`, post `Notification.Name.statusBarDisplayPreferenceDidChange` on changes, and refresh the status item through `MenuTrackingRefresh`. If no explicit selection exists, show the first two available values from the first device with a reading. Displayed values always render in one custom status item view with one vertical label column (`AIR` for non-radiation sensors, `RAD` for radiation sensors) and one or two value rows. Single-value displays use the larger menu bar value font; two-value displays use the compact stacked value font. Keep sensor icons out of the value display
+- **Display Unit System**: Users can choose Metric or Imperial units in Settings > General. Store the explicit choice in `DisplayUnitSystemPreferences`; when unset, default from `Locale.current.measurementSystem`. Post `Notification.Name.displayUnitSystemPreferenceDidChange` on changes and refresh display surfaces through `MenuTrackingRefresh`. Keep all user-facing sensor value formatting centralized in `StatusBarDisplayMetric.valueString(for:)` so the status item, menu dropdown, Devices preview, and notification metric clauses stay consistent
+- **Settings Help Text**: General settings controls include concise secondary explanatory text beneath each control. Keep this copy action-oriented and focused on user-visible behavior rather than implementation details
 - **Devices Settings Hierarchy**: Keep the Devices settings surface table-based, but use `NSOutlineView` when showing hierarchical device content. Device rows stay top-level with editable name and notification controls; metric rows are children used for menu bar display selection
-- **Update Cycle Progress**: Each sensor in the menu shows an `UpdateCycleProgressView` below the timestamp. Cycle position = `reading.ago at receive + time since lastUpdated`, repeating every interval via modulo while the menu stays open. Fill color fades from light green opaque to light green at 37% opacity. New readings re-anchor via `MonitoredDevice.updateSequence`. After a configurable number of missed intervals without a reading (**Degraded situation**, default 3, Settings > General), the bar shows full opaque dark red. UI refresh during menu tracking uses `MenuTrackingRefresh` (`.common` run loop); reading delivery relies on AranetKit monitor timers and `Notification.Name.aranetReadingDidUpdate`
+- **Update Cycle Progress**: Each sensor in the menu shows an `UpdateCycleProgressView` below the timestamp. Cycle position = `reading.ago at receive + time since lastUpdated`, repeating every interval via modulo while the menu stays open. Fill color fades from light green opaque to light green at 37% opacity. New readings re-anchor via `MonitoredDevice.updateSequence`. After a configurable number of missed intervals without a reading (**Degraded situation**, default 3, Settings > Advanced), the bar shows full opaque dark red. UI refresh during menu tracking uses `MenuTrackingRefresh` (`.common` run loop); reading delivery relies on AranetKit monitor timers and `Notification.Name.aranetReadingDidUpdate`
 
 ### Security & Safety
 
@@ -1754,3 +1756,20 @@ After making ANY code changes:
 - **Centralized scan-timeout preference**: Added `ScanPreferences` (key, default, resolved value) so `SensorManager` and `SettingsWindowController` no longer duplicate the `scanTimeout` UserDefaults key, the `15` default, or the fallback logic. Replaced `print` in `AppDelegate` scan failure with `NSLog`
 - **Settings outline checkbox helper**: Extracted `checkboxCell(identifier:action:in:)` mirroring the existing `textCell()` to remove duplicated make-or-create button boilerplate in the notifications and menu-bar columns
 - **Concurrency verified, no change**: Confirmed AranetKit posts `aranetReadingDidUpdate` only from `@MainActor`-isolated functions (synchronous `NotificationCenter.post`), so `SensorManager` and `NotificationManager` reading handlers already run on the main thread. The earlier-flagged dictionary race cannot occur; no dispatch hops were added
+
+### 2026-06-27 (display unit setting)
+
+- **General display unit preference**: Added Metric and Imperial display units in Settings > General. The effective default follows macOS `Locale.current.measurementSystem` until the user chooses a value, and changes post `displayUnitSystemPreferenceDidChange` for live status/menu refresh
+- **Centralized unit conversion**: `StatusBarDisplayMetric.valueString(for:)` now owns metric/imperial conversion for temperature, pressure, radiation, and radon so all display and notification surfaces stay aligned
+
+### 2026-06-27 (advanced settings)
+
+- **Advanced tab**: Moved the Degraded situation missed-cycle slider from Settings > General to Settings > Advanced and added compact explanatory copy below the slider describing stale readings and the dark red progress state
+
+### 2026-06-27 (settings help text)
+
+- **General tab explanations**: Added concise secondary text below Start at Login, Notification Personality, Units, and Scan timeout controls so Settings communicates user-visible effects directly in the UI
+
+### 2026-06-27 (general settings cleanup)
+
+- **Removed General rescan control**: Removed Rescan from Settings > General to keep the tab focused on persistent preferences; rescan remains available from device-focused surfaces

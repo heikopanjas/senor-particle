@@ -56,6 +56,7 @@ enum DeviceNamePreferences {
 extension NSToolbarItem.Identifier {
     fileprivate static let general = NSToolbarItem.Identifier("general")
     fileprivate static let devices = NSToolbarItem.Identifier("devices")
+    fileprivate static let advancedSettings = NSToolbarItem.Identifier("advancedSettings")
 }
 
 // MARK: - SettingsWindowController
@@ -64,11 +65,13 @@ class SettingsWindowController: NSWindowController {
     private var didCenter = false
     private let generalVC: GeneralViewController
     private let devicesVC: DevicesViewController
+    private let advancedSettingsVC: AdvancedSettingsViewController
     private var selectedIdentifier = NSToolbarItem.Identifier.general
 
     init(sensorManager: SensorManager) {
-        generalVC = GeneralViewController(sensorManager: sensorManager)
+        generalVC = GeneralViewController()
         devicesVC = DevicesViewController(sensorManager: sensorManager)
+        advancedSettingsVC = AdvancedSettingsViewController()
 
         super.init(
             window: NSWindow(
@@ -113,18 +116,37 @@ class SettingsWindowController: NSWindowController {
 
     @objc private func showGeneral() { switchToTab(.general) }
     @objc private func showDevices() { switchToTab(.devices) }
+    @objc private func showAdvancedSettings() { switchToTab(.advancedSettings) }
 
     private func switchToTab(_ identifier: NSToolbarItem.Identifier) {
         guard identifier != selectedIdentifier, let window else { return }
         selectedIdentifier = identifier
-        let newVC: NSViewController = identifier == .general ? generalVC : devicesVC
+        let newVC = viewController(for: identifier)
         if let contentBounds = window.contentView?.bounds {
             _ = newVC.view  // ensure loadView has been called
             newVC.view.frame = contentBounds
         }
         window.contentViewController = newVC
-        window.title = identifier == .general ? "General" : "Devices"
+        window.title = title(for: identifier)
         window.toolbar?.selectedItemIdentifier = identifier
+    }
+
+    private func viewController(for identifier: NSToolbarItem.Identifier) -> NSViewController {
+        switch identifier {
+            case .general: return generalVC
+            case .devices: return devicesVC
+            case .advancedSettings: return advancedSettingsVC
+            default: return generalVC
+        }
+    }
+
+    private func title(for identifier: NSToolbarItem.Identifier) -> String {
+        switch identifier {
+            case .general: return "General"
+            case .devices: return "Devices"
+            case .advancedSettings: return "Advanced"
+            default: return "Settings"
+        }
     }
 }
 
@@ -132,15 +154,15 @@ class SettingsWindowController: NSWindowController {
 
 extension SettingsWindowController: NSToolbarDelegate {
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.general, .devices]
+        [.general, .devices, .advancedSettings]
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.general, .devices]
+        [.general, .devices, .advancedSettings]
     }
 
     func toolbarSelectableItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.general, .devices]
+        [.general, .devices, .advancedSettings]
     }
 
     func toolbar(
@@ -160,6 +182,11 @@ extension SettingsWindowController: NSToolbarDelegate {
                 item.image = NSImage(systemSymbolName: "dot.radiowaves.left.and.right", accessibilityDescription: "Devices")
                 item.action = #selector(showDevices)
                 item.target = self
+            case .advancedSettings:
+                item.label = "Advanced"
+                item.image = NSImage(systemSymbolName: "slider.horizontal.3", accessibilityDescription: "Advanced")
+                item.action = #selector(showAdvancedSettings)
+                item.target = self
             default:
                 return nil
         }
@@ -170,22 +197,18 @@ extension SettingsWindowController: NSToolbarDelegate {
 // MARK: - GeneralViewController
 
 class GeneralViewController: NSViewController {
-    private weak var sensorManager: SensorManager?
     private var loginToggle: NSButton!
     private var personalityPopup: NSPopUpButton!
-    private var degradedLabel: NSTextField!
-    private var degradedSlider: NSSlider!
+    private var unitSystemControl: NSSegmentedControl!
     private var timeoutLabel: NSTextField!
     private var timeoutSlider: NSSlider!
-    private var rescanButton: NSButton!
 
     override var preferredContentSize: NSSize {
-        get { isViewLoaded ? view.bounds.size : NSSize(width: 420, height: 382) }
+        get { isViewLoaded ? view.bounds.size : NSSize(width: 420, height: 390) }
         set {}
     }
 
-    init(sensorManager: SensorManager) {
-        self.sensorManager = sensorManager
+    init() {
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -193,9 +216,10 @@ class GeneralViewController: NSViewController {
 
     override func loadView() {
         let w: CGFloat = 420
-        let h: CGFloat = 382
+        let h: CGFloat = 390
         let x: CGFloat = 20
         let controlW = w - 2 * x
+        let descriptionHeight: CGFloat = 28
         var y = h - 20 - 22
 
         view = NSView(frame: NSRect(x: 0, y: 0, width: w, height: h))
@@ -204,6 +228,15 @@ class GeneralViewController: NSViewController {
         loginToggle.frame = NSRect(x: x, y: y, width: controlW, height: 22)
         loginToggle.autoresizingMask = [.minYMargin, .width]
         view.addSubview(loginToggle)
+
+        y -= 4 + descriptionHeight
+        addDescription(
+            "Open Se\u{00F1}or Particle automatically after you sign in to macOS.",
+            x: x,
+            y: y,
+            width: controlW,
+            height: descriptionHeight
+        )
 
         y -= 16 + 16
         let personalityLabel = NSTextField(labelWithString: "Notification Personality")
@@ -221,25 +254,40 @@ class GeneralViewController: NSViewController {
         personalityPopup.action = #selector(personalityChanged(_:))
         view.addSubview(personalityPopup)
 
-        y -= 16 + 16
-        degradedLabel = NSTextField(labelWithString: "")
-        degradedLabel.frame = NSRect(x: x, y: y, width: controlW, height: 16)
-        degradedLabel.autoresizingMask = [.minYMargin, .width]
-        view.addSubview(degradedLabel)
-
-        y -= 4 + 22
-        degradedSlider = NSSlider(
-            value: Double(DegradedSituationPreferences.defaultCycles),
-            minValue: Double(DegradedSituationPreferences.minimumCycles),
-            maxValue: Double(DegradedSituationPreferences.maximumCycles),
-            target: self,
-            action: #selector(degradedSliderChanged(_:))
+        y -= 4 + descriptionHeight
+        addDescription(
+            "Controls the tone of status notifications when sensor health changes.",
+            x: x,
+            y: y,
+            width: controlW,
+            height: descriptionHeight
         )
-        degradedSlider.numberOfTickMarks = DegradedSituationPreferences.maximumCycles
-        degradedSlider.allowsTickMarkValuesOnly = true
-        degradedSlider.frame = NSRect(x: x, y: y, width: controlW, height: 22)
-        degradedSlider.autoresizingMask = [.minYMargin, .width]
-        view.addSubview(degradedSlider)
+
+        y -= 16 + 16
+        let unitSystemLabel = NSTextField(labelWithString: "Units")
+        unitSystemLabel.frame = NSRect(x: x, y: y, width: controlW, height: 16)
+        unitSystemLabel.autoresizingMask = [.minYMargin, .width]
+        view.addSubview(unitSystemLabel)
+
+        y -= 4 + 24
+        unitSystemControl = NSSegmentedControl(
+            labels: DisplayUnitSystem.allCases.map(\.displayName),
+            trackingMode: .selectOne,
+            target: self,
+            action: #selector(unitSystemChanged(_:))
+        )
+        unitSystemControl.frame = NSRect(x: x, y: y, width: controlW, height: 24)
+        unitSystemControl.autoresizingMask = [.minYMargin, .width]
+        view.addSubview(unitSystemControl)
+
+        y -= 4 + descriptionHeight
+        addDescription(
+            "Controls how temperature, pressure, radiation, and radon values are displayed.",
+            x: x,
+            y: y,
+            width: controlW,
+            height: descriptionHeight
+        )
 
         y -= 16 + 16
         timeoutLabel = NSTextField(labelWithString: "")
@@ -255,21 +303,13 @@ class GeneralViewController: NSViewController {
         timeoutSlider.autoresizingMask = [.minYMargin, .width]
         view.addSubview(timeoutSlider)
 
-        y -= 16 + 22
-        rescanButton = NSButton(title: "Rescan", target: self, action: #selector(rescanDevices))
-        rescanButton.bezelStyle = .rounded
-        rescanButton.frame = NSRect(x: x, y: y, width: 90, height: 22)
-        rescanButton.autoresizingMask = [.minYMargin]
-        view.addSubview(rescanButton)
-    }
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleScanStateChange),
-            name: .aranetScanStateDidChange,
-            object: nil
+        y -= 4 + descriptionHeight
+        addDescription(
+            "How long a scan waits for nearby sensors before showing the results.",
+            x: x,
+            y: y,
+            width: controlW,
+            height: descriptionHeight
         )
     }
 
@@ -281,20 +321,15 @@ class GeneralViewController: NSViewController {
         timeoutSlider.doubleValue = timeout
         updateTimeoutLabel(seconds: timeout)
 
-        let cycles = DegradedSituationPreferences.cycles
-        degradedSlider.doubleValue = Double(cycles)
-        updateDegradedLabel(cycles: cycles)
-
-        rescanButton.isEnabled = !(sensorManager?.isScanning ?? false)
-
         let personality = NotificationPersonalityPreferences.current
         if let index = NotificationPersonality.allCases.firstIndex(of: personality) {
             personalityPopup.selectItem(at: index)
         }
-    }
 
-    deinit {
-        NotificationCenter.default.removeObserver(self)
+        let unitSystem = DisplayUnitSystemPreferences.current
+        if let index = DisplayUnitSystem.allCases.firstIndex(of: unitSystem) {
+            unitSystemControl.selectedSegment = index
+        }
     }
 
     // MARK: - Actions
@@ -303,6 +338,12 @@ class GeneralViewController: NSViewController {
         let index = sender.indexOfSelectedItem
         guard NotificationPersonality.allCases.indices.contains(index) else { return }
         NotificationPersonalityPreferences.current = NotificationPersonality.allCases[index]
+    }
+
+    @objc private func unitSystemChanged(_ sender: NSSegmentedControl) {
+        let index = sender.selectedSegment
+        guard DisplayUnitSystem.allCases.indices.contains(index) else { return }
+        DisplayUnitSystemPreferences.current = DisplayUnitSystem.allCases[index]
     }
 
     @objc private func toggleLogin(_ sender: NSButton) {
@@ -327,25 +368,97 @@ class GeneralViewController: NSViewController {
         updateTimeoutLabel(seconds: value)
     }
 
+    // MARK: - Private
+
+    private func updateTimeoutLabel(seconds: Double) {
+        timeoutLabel.stringValue = "Scan timeout: \(Int(seconds))s"
+    }
+
+    @discardableResult
+    private func addDescription(_ text: String, x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat) -> NSTextField {
+        let field = NSTextField(wrappingLabelWithString: text)
+        field.frame = NSRect(x: x, y: y, width: width, height: height)
+        field.autoresizingMask = [.minYMargin, .width]
+        field.textColor = .secondaryLabelColor
+        field.font = .systemFont(ofSize: 11)
+        view.addSubview(field)
+        return field
+    }
+}
+
+// MARK: - AdvancedSettingsViewController
+
+class AdvancedSettingsViewController: NSViewController {
+    private var degradedLabel: NSTextField!
+    private var degradedDescription: NSTextField!
+    private var degradedSlider: NSSlider!
+
+    override var preferredContentSize: NSSize {
+        get { isViewLoaded ? view.bounds.size : NSSize(width: 420, height: 142) }
+        set {}
+    }
+
+    init() {
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable) required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func loadView() {
+        let w: CGFloat = 420
+        let h: CGFloat = 142
+        let x: CGFloat = 20
+        let controlW = w - 2 * x
+        var y = h - 20 - 16
+
+        view = NSView(frame: NSRect(x: 0, y: 0, width: w, height: h))
+
+        degradedLabel = NSTextField(labelWithString: "")
+        degradedLabel.frame = NSRect(x: x, y: y, width: controlW, height: 16)
+        degradedLabel.autoresizingMask = [.minYMargin, .width]
+        view.addSubview(degradedLabel)
+
+        y -= 4 + 22
+        degradedSlider = NSSlider(
+            value: Double(DegradedSituationPreferences.defaultCycles),
+            minValue: Double(DegradedSituationPreferences.minimumCycles),
+            maxValue: Double(DegradedSituationPreferences.maximumCycles),
+            target: self,
+            action: #selector(degradedSliderChanged(_:))
+        )
+        degradedSlider.numberOfTickMarks = DegradedSituationPreferences.maximumCycles
+        degradedSlider.allowsTickMarkValuesOnly = true
+        degradedSlider.frame = NSRect(x: x, y: y, width: controlW, height: 22)
+        degradedSlider.autoresizingMask = [.minYMargin, .width]
+        view.addSubview(degradedSlider)
+
+        y -= 8 + 44
+        degradedDescription = NSTextField(wrappingLabelWithString: "")
+        degradedDescription.frame = NSRect(x: x, y: y, width: controlW, height: 44)
+        degradedDescription.autoresizingMask = [.minYMargin, .width]
+        degradedDescription.textColor = .secondaryLabelColor
+        degradedDescription.font = .systemFont(ofSize: 11)
+        degradedDescription.stringValue =
+            "A degraded situation means a sensor has missed consecutive expected update cycles. At this threshold, the progress bar turns dark red to show the reading may be stale."
+        view.addSubview(degradedDescription)
+    }
+
+    override func viewWillAppear() {
+        super.viewWillAppear()
+        let cycles = DegradedSituationPreferences.cycles
+        degradedSlider.doubleValue = Double(cycles)
+        updateDegradedLabel(cycles: cycles)
+    }
+
+    // MARK: - Actions
+
     @objc private func degradedSliderChanged(_ sender: NSSlider) {
         let cycles = Int(sender.doubleValue.rounded())
         DegradedSituationPreferences.cycles = cycles
         updateDegradedLabel(cycles: cycles)
     }
 
-    @objc private func rescanDevices() {
-        sensorManager?.rescan()
-    }
-
-    @objc private func handleScanStateChange() {
-        rescanButton.isEnabled = !(sensorManager?.isScanning ?? false)
-    }
-
     // MARK: - Private
-
-    private func updateTimeoutLabel(seconds: Double) {
-        timeoutLabel.stringValue = "Scan timeout: \(Int(seconds))s"
-    }
 
     private func updateDegradedLabel(cycles: Int) {
         degradedLabel.stringValue = "Degraded situation: \(cycles) missed update cycles"
@@ -469,6 +582,12 @@ class DevicesViewController: NSViewController {
             name: .aranetScanStateDidChange,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleDisplayUnitSystemPreferenceDidChange),
+            name: .displayUnitSystemPreferenceDidChange,
+            object: nil
+        )
     }
 
     override func viewWillAppear() {
@@ -487,6 +606,10 @@ class DevicesViewController: NSViewController {
 
     @objc private func handleScanStateChange() {
         rescanButton.isEnabled = !(sensorManager?.isScanning ?? false)
+        reloadOutlineData()
+    }
+
+    @objc private func handleDisplayUnitSystemPreferenceDidChange() {
         reloadOutlineData()
     }
 
