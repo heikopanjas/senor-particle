@@ -54,7 +54,7 @@ import Cocoa
                     self?.menuManager?.refreshIfNeeded()
                 }
             }
-            catch { print("Scan failed: \(error)") }
+            catch { NSLog("[AppDelegate] Scan failed: %@", error.localizedDescription) }
         }
     }
 

@@ -66,15 +66,14 @@ enum StatusNotificationCopy {
     }
 
     private static func metricClause(for reading: AranetReading) -> String {
-        if let co2 = reading.co2 {
-            return "CO\u{2082} is \(co2) ppm."
+        if let value = StatusBarDisplayMetric.co2.valueString(for: reading) {
+            return "CO\u{2082} is \(value)."
         }
-        if let rate = reading.radiationRate {
-            let uSv = rate.converted(to: .microsieverts)
-            return String(format: "Radiation is %.3f \u{00B5}Sv/h.", uSv.value)
+        if let value = StatusBarDisplayMetric.radiationRate.valueString(for: reading) {
+            return "Radiation is \(value)."
         }
-        if let radon = reading.radonConcentration {
-            return String(format: "Radon is %.0f Bq/m\u{00B3}.", radon.value)
+        if let value = StatusBarDisplayMetric.radonConcentration.valueString(for: reading) {
+            return "Radon is \(value)."
         }
         return "Sensor reading updated."
     }

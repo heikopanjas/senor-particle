@@ -162,10 +162,7 @@ class SensorDeviceView: NSView {
     }
 
     private func configureLabel(_ label: NSTextField, size: CGFloat, weight: NSFont.Weight) {
-        label.backgroundColor = .clear
-        label.isBezeled = false
-        label.isEditable = false
-        label.isSelectable = false
+        label.applyPlainLabelStyle()
         label.font = .systemFont(ofSize: size, weight: weight)
         label.lineBreakMode = .byTruncatingTail
     }

@@ -190,11 +190,6 @@ enum StatusBarDisplayMetric: String, CaseIterable {
         }
     }
 
-    func statusItemTitle(for reading: AranetReading) -> String? {
-        guard let value = valueString(for: reading) else { return nil }
-        return " \(value)"
-    }
-
     static func availableMetrics(for reading: AranetReading?) -> [StatusBarDisplayMetric] {
         guard let reading else { return [] }
         return allCases.filter { $0.valueString(for: reading) != nil }

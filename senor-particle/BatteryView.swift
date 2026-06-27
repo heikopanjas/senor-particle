@@ -7,6 +7,7 @@ class BatteryView: NSView {
     private let iconHeight: CGFloat = 12
     private let iconWidth: CGFloat = 22
     private let spacing: CGFloat = 2
+    private let criticalBatteryThreshold = 7
 
     override var isFlipped: Bool { true }
 
@@ -29,7 +30,7 @@ class BatteryView: NSView {
         let symbolName = batterySymbolName(for: battery)
         let config = NSImage.SymbolConfiguration(pointSize: iconHeight, weight: .regular)
         imageView.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Battery \(battery)%")?.withSymbolConfiguration(config)
-        imageView.contentTintColor = battery < 7 ? .systemRed : .secondaryLabelColor
+        imageView.contentTintColor = battery < criticalBatteryThreshold ? .systemRed : .secondaryLabelColor
 
         layoutContent()
     }
@@ -45,10 +46,7 @@ class BatteryView: NSView {
         imageView.imageScaling = .scaleProportionallyUpOrDown
         addSubview(imageView)
 
-        label.backgroundColor = .clear
-        label.isBezeled = false
-        label.isEditable = false
-        label.isSelectable = false
+        label.applyPlainLabelStyle()
         label.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
         label.textColor = .secondaryLabelColor
         label.alignment = .right
@@ -69,7 +67,6 @@ class BatteryView: NSView {
     }
 
     private func batterySymbolName(for level: Int) -> String {
-        if level < 7 { return "battery.0percent" }
         if level < 13 { return "battery.0percent" }
         if level < 38 { return "battery.25percent" }
         if level < 63 { return "battery.50percent" }

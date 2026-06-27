@@ -179,8 +179,6 @@ class GeneralViewController: NSViewController {
     private var timeoutSlider: NSSlider!
     private var rescanButton: NSButton!
 
-    private let defaultTimeout: Double = 15
-
     override var preferredContentSize: NSSize {
         get { isViewLoaded ? view.bounds.size : NSSize(width: 420, height: 382) }
         set {}
@@ -250,7 +248,7 @@ class GeneralViewController: NSViewController {
         view.addSubview(timeoutLabel)
 
         y -= 4 + 22
-        timeoutSlider = NSSlider(value: defaultTimeout, minValue: 10, maxValue: 60, target: self, action: #selector(sliderChanged(_:)))
+        timeoutSlider = NSSlider(value: ScanPreferences.defaultTimeout, minValue: 10, maxValue: 60, target: self, action: #selector(sliderChanged(_:)))
         timeoutSlider.numberOfTickMarks = 51
         timeoutSlider.allowsTickMarkValuesOnly = true
         timeoutSlider.frame = NSRect(x: x, y: y, width: controlW, height: 22)
@@ -279,8 +277,7 @@ class GeneralViewController: NSViewController {
         super.viewWillAppear()
         loginToggle.state = SMAppService.mainApp.status == .enabled ? .on : .off
 
-        let stored = UserDefaults.standard.double(forKey: "scanTimeout")
-        let timeout = stored > 0 ? stored : defaultTimeout
+        let timeout = ScanPreferences.timeout
         timeoutSlider.doubleValue = timeout
         updateTimeoutLabel(seconds: timeout)
 
@@ -326,7 +323,7 @@ class GeneralViewController: NSViewController {
 
     @objc private func sliderChanged(_ sender: NSSlider) {
         let value = sender.doubleValue
-        UserDefaults.standard.set(value, forKey: "scanTimeout")
+        ScanPreferences.storedTimeout = value
         updateTimeoutLabel(seconds: value)
     }
 
@@ -671,19 +668,8 @@ extension DevicesViewController: NSOutlineViewDelegate {
         else { return nil }
 
         if colId.rawValue == "notifications" {
-            let cellId = NSUserInterfaceItemIdentifier("cell-notifications")
-            let btn: NSButton
-            if let existing = outlineView.makeView(withIdentifier: cellId, owner: nil) as? NSButton {
-                btn = existing
-            }
-            else {
-                btn = NSButton()
-                btn.identifier = cellId
-                btn.setButtonType(.switch)
-                btn.title = ""
-                btn.target = self
-                btn.action = #selector(notificationToggleChanged(_:))
-            }
+            let btn = checkboxCell(
+                identifier: "cell-notifications", action: #selector(notificationToggleChanged(_:)), in: outlineView)
             btn.state = NotificationPreferences.isEnabled(for: device.device.id) ? .on : .off
             return btn
         }
@@ -759,15 +745,8 @@ extension DevicesViewController: NSOutlineViewDelegate {
                 }
                 return cell
             case "menuBar":
-                let cellId = NSUserInterfaceItemIdentifier("cell-menu-bar")
-                let btn: NSButton
-                if let existing = outlineView.makeView(withIdentifier: cellId, owner: nil) as? NSButton {
-                    btn = existing
-                }
-                else {
-                    btn = NSButton(checkboxWithTitle: "", target: self, action: #selector(menuBarMetricChanged(_:)))
-                    btn.identifier = cellId
-                }
+                let btn = checkboxCell(
+                    identifier: "cell-menu-bar", action: #selector(menuBarMetricChanged(_:)), in: outlineView)
                 btn.state = isMenuBarMetricSelected(item) ? .on : .off
                 btn.isEnabled = canSelectMenuBarMetric(item)
                 return btn
@@ -787,6 +766,17 @@ extension DevicesViewController: NSOutlineViewDelegate {
         cell.lineBreakMode = .byTruncatingTail
         cell.font = .systemFont(ofSize: 11)
         return cell
+    }
+
+    private func checkboxCell(identifier: String, action: Selector, in outlineView: NSOutlineView) -> NSButton {
+        let cellId = NSUserInterfaceItemIdentifier(identifier)
+        if let existing = outlineView.makeView(withIdentifier: cellId, owner: nil) as? NSButton {
+            return existing
+        }
+
+        let btn = NSButton(checkboxWithTitle: "", target: self, action: action)
+        btn.identifier = cellId
+        return btn
     }
 
     @objc private func notificationToggleChanged(_ sender: NSButton) {

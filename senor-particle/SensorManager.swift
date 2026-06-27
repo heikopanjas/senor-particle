@@ -41,8 +41,7 @@ class SensorManager {
         isScanning = true
         defer { isScanning = false }
 
-        let timeout = UserDefaults.standard.double(forKey: "scanTimeout")
-        let found = try await client.scan(timeout: timeout > 0 ? timeout : 15.0)
+        let found = try await client.scan(timeout: ScanPreferences.timeout)
         for device in found where devices[device.id] == nil { devices[device.id] = MonitoredDevice(device: device) }
     }
 
