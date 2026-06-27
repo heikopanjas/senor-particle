@@ -38,7 +38,16 @@ playground.xcworkspace
 *.xcodeproj/*
 !*.xcodeproj/project.pbxproj
 !*.xcodeproj/xcshareddata/
+!*.xcodeproj/project.xcworkspace/
+!*.xcodeproj/project.xcworkspace/xcshareddata/
+!*.xcodeproj/project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
+!*.xcodeproj/project.xcworkspace/xcuserdata/
+!*.xcodeproj/project.xcworkspace/xcuserdata/heiko.xcuserdatad/
+!*.xcodeproj/project.xcworkspace/xcuserdata/heiko.xcuserdatad/WorkspaceSettings.xcsettings
 !*.xcworkspace/contents.xcworkspacedata
+*.xcodeproj/project.xcworkspace/contents.xcworkspacedata
+*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+*.xcodeproj/project.xcworkspace/xcuserdata/heiko.xcuserdatad/UserInterfaceState.xcuserstate
 /*.gcno
 
 # Swift Package Manager

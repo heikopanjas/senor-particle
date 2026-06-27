@@ -1495,6 +1495,8 @@ open senor-particle.xcodeproj
 
 Always pass `-destination "generic/platform=macOS"` to avoid ambiguous destination warnings.
 Debug builds write the app bundle to `Build/Products/Debug/Senor Particle.app` inside the repository.
+Xcode-generated caches, indexes, logs, SDK stat caches, and Swift package checkouts are routed under `Build/`.
+Derived Data is configured as a project-relative `Build` location via workspace settings.
 
 ```bash
 # Build the project (debug)
@@ -1739,5 +1741,7 @@ After making ANY code changes:
 - **Status item metric selector**: Added a Settings > Devices outline hierarchy where each sensor expands to selectable metric rows. The selected device UUID and metric choices are persisted through `StatusBarDisplayPreferences`, and `AppDelegate` refreshes the status item on preference changes so users can pin the menu bar display to specific sensor values
 - **Shared metric formatting**: Centralized displayable Aranet metrics in `StatusBarDisplayMetric` so status item titles, Settings metric rows, and menu dropdown readings share labels and formatting, including radon concentration
 - **Debug build output path**: Set the target Debug `CONFIGURATION_BUILD_DIR` to `$(PROJECT_DIR)/Build/Products/Debug` so command-line and Xcode debug builds produce `Build/Products/Debug/Senor Particle.app` in the repository. Keep Swift, library, and framework search paths pointed at `$(BUILD_DIR)/$(CONFIGURATION)` so local Swift package products remain discoverable
+- **Xcode generated directory locations**: Project build settings plus workspace Derived Data settings route `CompilationCache.noindex`, `Index.noindex`, `ModuleCache.noindex`, `SDKStatCaches.noindex`, `SourcePackages`, and `Logs` under `Build/` so repository-root Xcode artifacts stay contained
+- **Project-relative Derived Data**: Added workspace settings for project-relative Derived Data at `Build`, which keeps `SourcePackages`, `Logs`, and `Index.noindex` under the repository `Build/` hierarchy while explicit build settings keep compilation, module, and SDK stat caches there too
 - **Text-only status item values**: Removed sensor icons from the menu bar value display so selected metrics render as text only, while placeholder states can continue to use the scanning symbol
 - **Dual status item display**: Expanded status item selection to up to two ordered metrics from the same device. The Devices outline uses constrained checkboxes, and `StatusItemDisplayView` renders selected or automatic values inside the single `NSStatusItem` as one vertical label (`AIR` or `RAD`) with one or two value rows

@@ -143,6 +143,8 @@
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_ENABLE_MODULES = YES;
+				CLANG_MODULE_CACHE_PATH = "$(PROJECT_DIR)/Build/ModuleCache.noindex";
+				CLANG_MODULES_BUILD_SESSION_FILE = "$(PROJECT_DIR)/Build/ModuleCache.noindex/Session.modulevalidation";
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
@@ -168,6 +170,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				COMPILATION_CACHE_CAS_PATH = "$(PROJECT_DIR)/Build/CompilationCache.noindex";
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 8J2G689FCZ;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -188,11 +191,17 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				DERIVED_DATA_DIR = "$(PROJECT_DIR)/Build";
+				INDEX_DATA_STORE_DIR = "$(PROJECT_DIR)/Build/Index.noindex/DataStore";
+				LOGS_ROOT = "$(PROJECT_DIR)/Build/Logs";
 				MACOSX_DEPLOYMENT_TARGET = 15.7;
+				MODULE_CACHE_DIR = "$(PROJECT_DIR)/Build/ModuleCache.noindex";
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
+				SDK_STAT_CACHE_DIR = "$(PROJECT_DIR)/Build";
+				SOURCE_PACKAGES_DIR = "$(PROJECT_DIR)/Build/SourcePackages";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -207,6 +216,8 @@
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_ENABLE_MODULES = YES;
+				CLANG_MODULE_CACHE_PATH = "$(PROJECT_DIR)/Build/ModuleCache.noindex";
+				CLANG_MODULES_BUILD_SESSION_FILE = "$(PROJECT_DIR)/Build/ModuleCache.noindex/Session.modulevalidation";
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
@@ -231,6 +242,7 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COMPILATION_CACHE_CAS_PATH = "$(PROJECT_DIR)/Build/CompilationCache.noindex";
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 8J2G689FCZ;
@@ -246,10 +258,16 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				DERIVED_DATA_DIR = "$(PROJECT_DIR)/Build";
+				INDEX_DATA_STORE_DIR = "$(PROJECT_DIR)/Build/Index.noindex/DataStore";
+				LOGS_ROOT = "$(PROJECT_DIR)/Build/Logs";
 				MACOSX_DEPLOYMENT_TARGET = 15.7;
+				MODULE_CACHE_DIR = "$(PROJECT_DIR)/Build/ModuleCache.noindex";
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
+				SDK_STAT_CACHE_DIR = "$(PROJECT_DIR)/Build";
+				SOURCE_PACKAGES_DIR = "$(PROJECT_DIR)/Build/SourcePackages";
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
@@ -263,6 +281,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
+				CLANG_MODULES_BUILD_SESSION_FILE = "$(PROJECT_DIR)/Build/ModuleCache.noindex/Session.modulevalidation";
 				CONFIGURATION_BUILD_DIR = "$(PROJECT_DIR)/Build/Products/Debug";
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
@@ -277,6 +296,7 @@
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				INDEX_DATA_STORE_DIR = "$(PROJECT_DIR)/Build/Index.noindex/DataStore";
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(BUILD_DIR)/$(CONFIGURATION)",
@@ -317,6 +337,7 @@
 				CODE_SIGN_ENTITLEMENTS = "senor-particle/senor-particle.entitlements";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
+				CLANG_MODULES_BUILD_SESSION_FILE = "$(PROJECT_DIR)/Build/ModuleCache.noindex/Session.modulevalidation";
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
@@ -331,6 +352,7 @@
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				INDEX_DATA_STORE_DIR = "$(PROJECT_DIR)/Build/Index.noindex/DataStore";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
