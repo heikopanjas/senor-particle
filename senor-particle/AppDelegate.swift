@@ -6,6 +6,7 @@ import Cocoa
     private var sensorManager: SensorManager?
     private var menuManager: MenuManager?
     private var notificationManager: NotificationManager?
+    private let statusItemDisplayView = StatusItemDisplayView()
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -91,19 +92,18 @@ import Cocoa
         if let selection = StatusBarDisplayPreferences.selection {
             guard let device = sensorManager.devices[selection.deviceId],
                 let reading = device.reading,
-                let title = selection.metric.statusItemTitle(for: reading)
+                let values = StatusBarDisplayPreferences.valueStrings(for: selection, reading: reading)
             else {
                 setStatusBarPlaceholder()
                 return
             }
 
-            applyStatusBarTitle(title)
+            applyStatusBarValues(values, label: compactStatusLabel(for: reading))
             return
         }
 
         guard let reading = sensorManager.sortedDevices.first(where: { $0.reading != nil })?.reading,
-            let metric = StatusBarDisplayMetric.defaultMetric(for: reading),
-            let title = metric.statusItemTitle(for: reading)
+            let title = StatusBarDisplayPreferences.defaultTitle(for: reading)
         else {
             setStatusBarPlaceholder()
             return
@@ -115,6 +115,7 @@ import Cocoa
     private func applyStatusBarTitle(_ title: String) {
         guard let statusItem else { return }
 
+        removeStatusItemDisplayView()
         statusItem.button?.title = title
         statusItem.button?.image = nil
         statusItem.length = NSStatusItem.variableLength
@@ -123,15 +124,59 @@ import Cocoa
         statusItem.button?.window?.displayIfNeeded()
     }
 
+    private func applyStatusBarValues(_ values: [String], label: String) {
+        switch values.count {
+            case 1:
+                applyStatusBarTitle(" \(values[0])")
+            case 2:
+                applyCompactStatusBarValues(values, label: label)
+            default:
+                setStatusBarPlaceholder()
+        }
+    }
+
+    private func applyCompactStatusBarValues(_ values: [String], label: String) {
+        guard let statusItem, let button = statusItem.button else { return }
+
+        let displayValue = StatusItemDisplayValue(label: label, values: values)
+        let width = StatusItemDisplayView.requiredWidth(for: displayValue)
+        let height = button.bounds.height > 0 ? button.bounds.height : NSStatusBar.system.thickness
+
+        statusItem.length = width
+        button.title = ""
+        button.image = nil
+
+        if statusItemDisplayView.superview !== button {
+            statusItemDisplayView.removeFromSuperview()
+            button.addSubview(statusItemDisplayView)
+        }
+
+        statusItemDisplayView.frame = NSRect(x: 0, y: 0, width: width, height: height)
+        statusItemDisplayView.autoresizingMask = [.height]
+        statusItemDisplayView.configure(value: displayValue)
+        button.needsDisplay = true
+        button.displayIfNeeded()
+        button.window?.displayIfNeeded()
+    }
+
+    private func compactStatusLabel(for reading: AranetReading) -> String {
+        reading.deviceType == .aranetRadiation ? "RAD" : "AIR"
+    }
+
     private func setStatusBarPlaceholder() {
         guard let statusItem else { return }
 
+        removeStatusItemDisplayView()
         statusItem.button?.title = " \u{2026}"
         statusItem.button?.image = statusBarPlaceholderSymbol()
         statusItem.length = NSStatusItem.variableLength
         statusItem.button?.needsDisplay = true
         statusItem.button?.displayIfNeeded()
         statusItem.button?.window?.displayIfNeeded()
+    }
+
+    private func removeStatusItemDisplayView() {
+        statusItemDisplayView.removeFromSuperview()
     }
 
     private func statusBarPlaceholderSymbol() -> NSImage? {

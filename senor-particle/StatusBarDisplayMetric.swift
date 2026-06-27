@@ -7,32 +7,128 @@ extension Notification.Name {
 
 struct StatusBarDisplaySelection: Equatable {
     let deviceId: UUID
-    let metric: StatusBarDisplayMetric
+    let metrics: [StatusBarDisplayMetric]
 }
 
 enum StatusBarDisplayPreferences {
     private static let deviceIdKey = "statusBarDisplay.deviceId"
-    private static let metricKey = "statusBarDisplay.metric"
+    private static let legacyMetricKey = "statusBarDisplay.metric"
+    private static let metricsKey = "statusBarDisplay.metrics"
+    private static let maximumMetrics = 2
 
     static var selection: StatusBarDisplaySelection? {
         guard let deviceIdString = UserDefaults.standard.string(forKey: deviceIdKey),
-            let deviceId = UUID(uuidString: deviceIdString),
-            let metricString = UserDefaults.standard.string(forKey: metricKey),
-            let metric = StatusBarDisplayMetric(rawValue: metricString)
+            let deviceId = UUID(uuidString: deviceIdString)
         else { return nil }
 
-        return StatusBarDisplaySelection(deviceId: deviceId, metric: metric)
+        let storedMetricStrings =
+            UserDefaults.standard.stringArray(forKey: metricsKey)
+            ?? UserDefaults.standard.string(forKey: legacyMetricKey).map { [$0] }
+            ?? []
+
+        var metrics: [StatusBarDisplayMetric] = []
+        for metricString in storedMetricStrings {
+            guard let metric = StatusBarDisplayMetric(rawValue: metricString),
+                metrics.contains(metric) == false
+            else { continue }
+            metrics.append(metric)
+            if metrics.count == maximumMetrics { break }
+        }
+
+        guard metrics.isEmpty == false else { return nil }
+        return StatusBarDisplaySelection(deviceId: deviceId, metrics: metrics)
     }
 
     static func setSelection(deviceId: UUID, metric: StatusBarDisplayMetric) {
+        setSelection(deviceId: deviceId, metrics: [metric])
+    }
+
+    static func setSelection(deviceId: UUID, metrics: [StatusBarDisplayMetric]) {
+        var uniqueMetrics: [StatusBarDisplayMetric] = []
+        for metric in metrics where uniqueMetrics.contains(metric) == false {
+            uniqueMetrics.append(metric)
+            if uniqueMetrics.count == maximumMetrics { break }
+        }
+
+        guard uniqueMetrics.isEmpty == false else {
+            clearSelection()
+            return
+        }
+
         UserDefaults.standard.set(deviceId.uuidString, forKey: deviceIdKey)
-        UserDefaults.standard.set(metric.rawValue, forKey: metricKey)
+        UserDefaults.standard.set(uniqueMetrics.map(\.rawValue), forKey: metricsKey)
+        UserDefaults.standard.removeObject(forKey: legacyMetricKey)
+        NotificationCenter.default.post(name: .statusBarDisplayPreferenceDidChange, object: nil)
+    }
+
+    static func toggleSelection(deviceId: UUID, metric: StatusBarDisplayMetric) {
+        guard let selection, selection.deviceId == deviceId else {
+            setSelection(deviceId: deviceId, metric: metric)
+            return
+        }
+
+        var metrics = selection.metrics
+        if let index = metrics.firstIndex(of: metric) {
+            metrics.remove(at: index)
+        }
+        else if metrics.count < maximumMetrics {
+            metrics.append(metric)
+        }
+
+        setSelection(deviceId: deviceId, metrics: metrics)
+    }
+
+    static func canSelect(deviceId: UUID, metric: StatusBarDisplayMetric) -> Bool {
+        guard let selection else { return true }
+        guard selection.deviceId == deviceId else { return false }
+        return selection.metrics.contains(metric) || selection.metrics.count < maximumMetrics
+    }
+
+    static func isSelected(deviceId: UUID, metric: StatusBarDisplayMetric) -> Bool {
+        guard let selection, selection.deviceId == deviceId else { return false }
+        return selection.metrics.contains(metric)
+    }
+
+    static func valueStrings(for selection: StatusBarDisplaySelection, reading: AranetReading) -> [String]? {
+        let values = selection.metrics.compactMap { $0.valueString(for: reading) }
+        guard values.count == selection.metrics.count else { return nil }
+        return values
+    }
+
+    static func title(for selection: StatusBarDisplaySelection, reading: AranetReading) -> String? {
+        guard let value = valueStrings(for: selection, reading: reading)?.first else { return nil }
+        return " \(value)"
+    }
+
+    static func defaultTitle(for reading: AranetReading) -> String? {
+        guard let metric = StatusBarDisplayMetric.defaultMetric(for: reading),
+            let value = metric.valueString(for: reading)
+        else { return nil }
+        return " \(value)"
+    }
+
+    static func maximumMetricCountReached(for deviceId: UUID) -> Bool {
+        guard let selection, selection.deviceId == deviceId else { return false }
+        return selection.metrics.count >= maximumMetrics
+    }
+
+    static func hasSelection(on deviceId: UUID) -> Bool {
+        selection?.deviceId == deviceId
+    }
+
+    static func hasSelectionOnAnotherDevice(_ deviceId: UUID) -> Bool {
+        guard let selection else { return false }
+        return selection.deviceId != deviceId
+    }
+
+    static func postChangeNotification() {
         NotificationCenter.default.post(name: .statusBarDisplayPreferenceDidChange, object: nil)
     }
 
     static func clearSelection() {
         UserDefaults.standard.removeObject(forKey: deviceIdKey)
-        UserDefaults.standard.removeObject(forKey: metricKey)
+        UserDefaults.standard.removeObject(forKey: metricsKey)
+        UserDefaults.standard.removeObject(forKey: legacyMetricKey)
         NotificationCenter.default.post(name: .statusBarDisplayPreferenceDidChange, object: nil)
     }
 }

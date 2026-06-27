@@ -558,8 +558,11 @@ class DevicesViewController: NSViewController {
     }
 
     private func isMenuBarMetricSelected(_ item: MetricOutlineItem) -> Bool {
-        guard let selection = StatusBarDisplayPreferences.selection else { return false }
-        return selection.deviceId == item.deviceId && selection.metric == item.metric
+        StatusBarDisplayPreferences.isSelected(deviceId: item.deviceId, metric: item.metric)
+    }
+
+    private func canSelectMenuBarMetric(_ item: MetricOutlineItem) -> Bool {
+        StatusBarDisplayPreferences.canSelect(deviceId: item.deviceId, metric: item.metric)
     }
 }
 
@@ -762,10 +765,11 @@ extension DevicesViewController: NSOutlineViewDelegate {
                     btn = existing
                 }
                 else {
-                    btn = NSButton(radioButtonWithTitle: "", target: self, action: #selector(menuBarMetricChanged(_:)))
+                    btn = NSButton(checkboxWithTitle: "", target: self, action: #selector(menuBarMetricChanged(_:)))
                     btn.identifier = cellId
                 }
                 btn.state = isMenuBarMetricSelected(item) ? .on : .off
+                btn.isEnabled = canSelectMenuBarMetric(item)
                 return btn
             default:
                 return nil
@@ -799,7 +803,7 @@ extension DevicesViewController: NSOutlineViewDelegate {
             let item = outlineView.item(atRow: row) as? MetricOutlineItem
         else { return }
 
-        StatusBarDisplayPreferences.setSelection(deviceId: item.deviceId, metric: item.metric)
+        StatusBarDisplayPreferences.toggleSelection(deviceId: item.deviceId, metric: item.metric)
         reloadOutlineData()
     }
 }
