@@ -7,7 +7,8 @@ struct StatusItemDisplayValue {
 
 final class StatusItemDisplayView: NSView {
     private static let labelFont = NSFont.monospacedSystemFont(ofSize: 6.5, weight: .semibold)
-    private static let valueFont = NSFont.monospacedDigitSystemFont(ofSize: 9.5, weight: .semibold)
+    private static let singleValueFont = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
+    private static let stackedValueFont = NSFont.monospacedDigitSystemFont(ofSize: 9.5, weight: .semibold)
     private static let horizontalPadding: CGFloat = 3
     private static let labelValueGap: CGFloat = 3
     private static let labelWidth: CGFloat = 7
@@ -37,7 +38,7 @@ final class StatusItemDisplayView: NSView {
     @MainActor static func requiredWidth(for value: StatusItemDisplayValue) -> CGFloat {
         guard value.values.isEmpty == false else { return 0 }
 
-        let maxValueWidth = value.values.map(valueWidth(for:)).max() ?? 0
+        let maxValueWidth = value.values.map { valueWidth(for: $0, count: value.values.count) }.max() ?? 0
         return ceil(horizontalPadding * 2 + labelWidth + labelValueGap + maxValueWidth)
     }
 
@@ -63,11 +64,12 @@ final class StatusItemDisplayView: NSView {
         guard values.isEmpty == false else { return }
 
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: Self.valueFont,
+            .font: Self.valueFont(for: values.count),
             .foregroundColor: NSColor.labelColor
         ]
         let attributedValues = values.map { NSAttributedString(string: $0, attributes: attributes) }
-        let rowHeight = Self.valueFont.ascender - Self.valueFont.descender
+        let valueFont = Self.valueFont(for: values.count)
+        let rowHeight = valueFont.ascender - valueFont.descender
         let totalHeight =
             CGFloat(attributedValues.count) * rowHeight
             + CGFloat(max(attributedValues.count - 1, 0)) * Self.rowSpacing
@@ -79,8 +81,12 @@ final class StatusItemDisplayView: NSView {
         }
     }
 
-    private static func valueWidth(for value: String) -> CGFloat {
-        let attributes: [NSAttributedString.Key: Any] = [.font: valueFont]
+    private static func valueFont(for count: Int) -> NSFont {
+        count == 1 ? singleValueFont : stackedValueFont
+    }
+
+    private static func valueWidth(for value: String, count: Int) -> CGFloat {
+        let attributes: [NSAttributedString.Key: Any] = [.font: valueFont(for: count)]
         return ceil(NSAttributedString(string: value, attributes: attributes).size().width)
     }
 }

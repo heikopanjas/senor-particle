@@ -107,6 +107,14 @@ enum StatusBarDisplayPreferences {
         return " \(value)"
     }
 
+    static func defaultValueStrings(for reading: AranetReading) -> [String] {
+        Array(
+            StatusBarDisplayMetric.availableMetrics(for: reading)
+                .compactMap { $0.valueString(for: reading) }
+                .prefix(maximumMetrics)
+        )
+    }
+
     static func maximumMetricCountReached(for deviceId: UUID) -> Bool {
         guard let selection, selection.deviceId == deviceId else { return false }
         return selection.metrics.count >= maximumMetrics

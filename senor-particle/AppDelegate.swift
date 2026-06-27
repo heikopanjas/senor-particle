@@ -102,14 +102,12 @@ import Cocoa
             return
         }
 
-        guard let reading = sensorManager.sortedDevices.first(where: { $0.reading != nil })?.reading,
-            let title = StatusBarDisplayPreferences.defaultTitle(for: reading)
-        else {
+        guard let reading = sensorManager.sortedDevices.first(where: { $0.reading != nil })?.reading else {
             setStatusBarPlaceholder()
             return
         }
 
-        applyStatusBarTitle(title)
+        applyStatusBarValues(StatusBarDisplayPreferences.defaultValueStrings(for: reading), label: compactStatusLabel(for: reading))
     }
 
     private func applyStatusBarTitle(_ title: String) {
@@ -126,9 +124,7 @@ import Cocoa
 
     private func applyStatusBarValues(_ values: [String], label: String) {
         switch values.count {
-            case 1:
-                applyStatusBarTitle(" \(values[0])")
-            case 2:
+            case 1, 2:
                 applyCompactStatusBarValues(values, label: label)
             default:
                 setStatusBarPlaceholder()
