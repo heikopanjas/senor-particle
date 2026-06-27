@@ -359,8 +359,13 @@ class GeneralViewController: NSViewController {
 
 class DevicesViewController: NSViewController {
     private weak var sensorManager: SensorManager?
-    private var tableView: NSTableView!
+    private var outlineView: NSOutlineView!
     private var rescanButton: NSButton!
+    private var deviceItems: [DeviceOutlineItem] = []
+    private var metricItemsByDeviceId: [UUID: [MetricOutlineItem]] = [:]
+    private var expandedDeviceIds: Set<UUID> = []
+    private var didSeedExpansion = false
+    private let scanningItem = ScanningOutlineItem()
 
     override var preferredContentSize: NSSize {
         get { isViewLoaded ? view.bounds.size : NSSize(width: 420, height: 300) }
@@ -381,49 +386,57 @@ class DevicesViewController: NSViewController {
 
         view = NSView(frame: NSRect(x: 0, y: 0, width: w, height: h))
 
-        tableView = NSTableView()
-        tableView.style = .inset
-        tableView.rowHeight = 18
-        tableView.usesAlternatingRowBackgroundColors = true
-        tableView.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
-        tableView.dataSource = self
-        tableView.delegate = self
+        outlineView = NSOutlineView()
+        outlineView.style = .inset
+        outlineView.rowHeight = 18
+        outlineView.usesAlternatingRowBackgroundColors = true
+        outlineView.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
+        outlineView.indentationPerLevel = 14
+        outlineView.dataSource = self
+        outlineView.delegate = self
 
         let deviceCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("device"))
         deviceCol.title = "Device"
         deviceCol.width = 120
         deviceCol.minWidth = 60
-        tableView.addTableColumn(deviceCol)
+        outlineView.addTableColumn(deviceCol)
+        outlineView.outlineTableColumn = deviceCol
 
         let uuidCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("uuid"))
         uuidCol.title = "UUID"
         uuidCol.width = 200
         uuidCol.minWidth = 100
-        tableView.addTableColumn(uuidCol)
+        outlineView.addTableColumn(uuidCol)
 
         let nameCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
         nameCol.title = "Name"
         nameCol.width = 110
         nameCol.minWidth = 60
-        tableView.addTableColumn(nameCol)
+        outlineView.addTableColumn(nameCol)
 
         let typeCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("type"))
         typeCol.title = "Type"
         typeCol.width = 90
         typeCol.minWidth = 60
-        tableView.addTableColumn(typeCol)
+        outlineView.addTableColumn(typeCol)
 
         let statusCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("status"))
         statusCol.title = "Status"
         statusCol.width = 80
         statusCol.minWidth = 50
-        tableView.addTableColumn(statusCol)
+        outlineView.addTableColumn(statusCol)
+
+        let menuBarCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("menuBar"))
+        menuBarCol.title = "Menu Bar"
+        menuBarCol.width = 70
+        menuBarCol.minWidth = 60
+        outlineView.addTableColumn(menuBarCol)
 
         let notifCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("notifications"))
         notifCol.title = "Notifications"
         notifCol.width = 80
         notifCol.minWidth = 60
-        tableView.addTableColumn(notifCol)
+        outlineView.addTableColumn(notifCol)
 
         let buttonH: CGFloat = 22
         let gap: CGFloat = 8
@@ -437,7 +450,7 @@ class DevicesViewController: NSViewController {
         let scrollY = p + buttonH + gap
         let scrollView = NSScrollView(
             frame: NSRect(x: p, y: scrollY, width: w - 2 * p, height: h - p - scrollY))
-        scrollView.documentView = tableView
+        scrollView.documentView = outlineView
         scrollView.hasVerticalScroller = true
         scrollView.autohidesScrollers = true
         scrollView.borderType = .bezelBorder
@@ -463,7 +476,7 @@ class DevicesViewController: NSViewController {
 
     override func viewWillAppear() {
         super.viewWillAppear()
-        tableView.reloadData()
+        reloadOutlineData()
         rescanButton.isEnabled = !(sensorManager?.isScanning ?? false)
     }
 
@@ -472,12 +485,12 @@ class DevicesViewController: NSViewController {
     }
 
     @objc private func handleReadingDidUpdate() {
-        tableView.reloadData()
+        reloadOutlineData()
     }
 
     @objc private func handleScanStateChange() {
         rescanButton.isEnabled = !(sensorManager?.isScanning ?? false)
-        tableView.reloadData()
+        reloadOutlineData()
     }
 
     @objc private func rescanDevices() {
@@ -494,6 +507,60 @@ class DevicesViewController: NSViewController {
         guard device.reading != nil, let date = device.lastUpdated else { return "Searching\u{2026}" }
         return Self.relativeFormatter.localizedString(for: date, relativeTo: Date())
     }
+
+    private func reloadOutlineData() {
+        if didSeedExpansion {
+            expandedDeviceIds = currentExpandedDeviceIds()
+        }
+
+        rebuildOutlineItems()
+        outlineView.reloadData()
+
+        if didSeedExpansion == false {
+            expandedDeviceIds = Set(deviceItems.map(\.deviceId))
+            didSeedExpansion = true
+        }
+
+        for item in deviceItems where expandedDeviceIds.contains(item.deviceId) {
+            outlineView.expandItem(item)
+        }
+    }
+
+    private func rebuildOutlineItems() {
+        guard let sensorManager, sensorManager.isScanning == false else {
+            deviceItems.removeAll()
+            metricItemsByDeviceId.removeAll()
+            return
+        }
+
+        let devices = sensorManager.sortedDevices
+        deviceItems = devices.map { DeviceOutlineItem(deviceId: $0.device.id) }
+        metricItemsByDeviceId = Dictionary(
+            uniqueKeysWithValues: devices.map { device in
+                let metrics = StatusBarDisplayMetric.availableMetrics(for: device.reading).map {
+                    MetricOutlineItem(deviceId: device.device.id, metric: $0)
+                }
+                return (device.device.id, metrics)
+            }
+        )
+    }
+
+    private func currentExpandedDeviceIds() -> Set<UUID> {
+        Set(deviceItems.compactMap { outlineView.isItemExpanded($0) ? $0.deviceId : nil })
+    }
+
+    private func device(for item: DeviceOutlineItem) -> MonitoredDevice? {
+        sensorManager?.devices[item.deviceId]
+    }
+
+    private func device(for item: MetricOutlineItem) -> MonitoredDevice? {
+        sensorManager?.devices[item.deviceId]
+    }
+
+    private func isMenuBarMetricSelected(_ item: MetricOutlineItem) -> Bool {
+        guard let selection = StatusBarDisplayPreferences.selection else { return false }
+        return selection.deviceId == item.deviceId && selection.metric == item.metric
+    }
 }
 
 // MARK: - DeviceNameTextField
@@ -502,51 +569,108 @@ private class DeviceNameTextField: NSTextField {
     var deviceId: UUID?
 }
 
-// MARK: - NSTableViewDataSource
+// MARK: - Outline items
 
-extension DevicesViewController: NSTableViewDataSource {
-    func numberOfRows(in tableView: NSTableView) -> Int {
-        guard let sensorManager else { return 0 }
-        return sensorManager.isScanning ? 1 : sensorManager.sortedDevices.count
+private final class ScanningOutlineItem {}
+
+private final class DeviceOutlineItem {
+    let deviceId: UUID
+
+    init(deviceId: UUID) {
+        self.deviceId = deviceId
     }
 }
 
-// MARK: - NSTableViewDelegate
+private final class MetricOutlineItem {
+    let deviceId: UUID
+    let metric: StatusBarDisplayMetric
 
-extension DevicesViewController: NSTableViewDelegate {
-    func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
-        return !(sensorManager?.isScanning ?? false)
+    init(deviceId: UUID, metric: StatusBarDisplayMetric) {
+        self.deviceId = deviceId
+        self.metric = metric
+    }
+}
+
+// MARK: - NSOutlineViewDataSource
+
+extension DevicesViewController: NSOutlineViewDataSource {
+    func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
+        guard let sensorManager else { return 0 }
+        if sensorManager.isScanning {
+            return item == nil ? 1 : 0
+        }
+        if let deviceItem = item as? DeviceOutlineItem {
+            return metricItemsByDeviceId[deviceItem.deviceId]?.count ?? 0
+        }
+        return item == nil ? deviceItems.count : 0
     }
 
-    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        guard let sensorManager else { return nil }
+    func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
+        guard let sensorManager else { return scanningItem }
 
         if sensorManager.isScanning {
-            guard tableColumn?.identifier.rawValue == "device" else { return nil }
-            let cellId = NSUserInterfaceItemIdentifier("cell-scanning")
-            let cell: NSTextField
-            if let existing = tableView.makeView(withIdentifier: cellId, owner: nil) as? NSTextField {
-                cell = existing
-            }
-            else {
-                cell = NSTextField(labelWithString: "")
-                cell.identifier = cellId
-                cell.font = .systemFont(ofSize: 11)
-                cell.textColor = .secondaryLabelColor
-            }
+            return scanningItem
+        }
+        if let deviceItem = item as? DeviceOutlineItem,
+            let metricItems = metricItemsByDeviceId[deviceItem.deviceId],
+            metricItems.indices.contains(index)
+        {
+            return metricItems[index]
+        }
+
+        return deviceItems[index]
+    }
+
+    func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
+        guard let deviceItem = item as? DeviceOutlineItem else { return false }
+        return metricItemsByDeviceId[deviceItem.deviceId]?.isEmpty == false
+    }
+}
+
+// MARK: - NSOutlineViewDelegate
+
+extension DevicesViewController: NSOutlineViewDelegate {
+    func outlineView(_ outlineView: NSOutlineView, shouldSelectItem item: Any) -> Bool {
+        !(item is ScanningOutlineItem)
+    }
+
+    func outlineView(_ outlineView: NSOutlineView, shouldShowOutlineCellForItem item: Any) -> Bool {
+        item is DeviceOutlineItem
+    }
+
+    func outlineViewItemDidExpand(_ notification: Notification) {
+        guard let item = notification.userInfo?["NSObject"] as? DeviceOutlineItem else { return }
+        expandedDeviceIds.insert(item.deviceId)
+    }
+
+    func outlineViewItemDidCollapse(_ notification: Notification) {
+        guard let item = notification.userInfo?["NSObject"] as? DeviceOutlineItem else { return }
+        expandedDeviceIds.remove(item.deviceId)
+    }
+
+    func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
+        let colId = tableColumn?.identifier ?? NSUserInterfaceItemIdentifier("")
+
+        if item is ScanningOutlineItem {
+            guard colId.rawValue == "device" else { return nil }
+            let cell = textCell(identifier: "cell-scanning", in: outlineView)
             cell.stringValue = "Scanning for devices\u{2026}"
+            cell.textColor = .secondaryLabelColor
             return cell
         }
 
-        let devices = sensorManager.sortedDevices
-        guard row < devices.count else { return nil }
-        let device = devices[row]
-        let colId = tableColumn?.identifier ?? NSUserInterfaceItemIdentifier("")
+        if let metricItem = item as? MetricOutlineItem {
+            return view(for: metricItem, columnId: colId, in: outlineView)
+        }
+
+        guard let deviceItem = item as? DeviceOutlineItem,
+            let device = device(for: deviceItem)
+        else { return nil }
 
         if colId.rawValue == "notifications" {
             let cellId = NSUserInterfaceItemIdentifier("cell-notifications")
             let btn: NSButton
-            if let existing = tableView.makeView(withIdentifier: cellId, owner: nil) as? NSButton {
+            if let existing = outlineView.makeView(withIdentifier: cellId, owner: nil) as? NSButton {
                 btn = existing
             }
             else {
@@ -561,10 +685,14 @@ extension DevicesViewController: NSTableViewDelegate {
             return btn
         }
 
+        if colId.rawValue == "menuBar" {
+            return nil
+        }
+
         if colId.rawValue == "name" {
             let cellId = NSUserInterfaceItemIdentifier("cell-name")
             let field: DeviceNameTextField
-            if let existing = tableView.makeView(withIdentifier: cellId, owner: nil) as? DeviceNameTextField {
+            if let existing = outlineView.makeView(withIdentifier: cellId, owner: nil) as? DeviceNameTextField {
                 field = existing
             }
             else {
@@ -582,17 +710,7 @@ extension DevicesViewController: NSTableViewDelegate {
             return field
         }
 
-        let cellId = NSUserInterfaceItemIdentifier("cell-\(colId.rawValue)")
-        let cell: NSTextField
-        if let existing = tableView.makeView(withIdentifier: cellId, owner: nil) as? NSTextField {
-            cell = existing
-        }
-        else {
-            cell = NSTextField(labelWithString: "")
-            cell.identifier = cellId
-            cell.lineBreakMode = .byTruncatingTail
-            cell.font = .systemFont(ofSize: 11)
-        }
+        let cell = textCell(identifier: "cell-\(colId.rawValue)", in: outlineView)
 
         switch colId.rawValue {
             case "device":
@@ -613,10 +731,76 @@ extension DevicesViewController: NSTableViewDelegate {
         return cell
     }
 
+    private func view(
+        for item: MetricOutlineItem, columnId: NSUserInterfaceItemIdentifier, in outlineView: NSOutlineView
+    )
+        -> NSView?
+    {
+        switch columnId.rawValue {
+            case "device":
+                let cell = textCell(identifier: "cell-metric-device", in: outlineView)
+                cell.stringValue = item.metric.label
+                cell.textColor = .labelColor
+                return cell
+            case "status":
+                let cell = textCell(identifier: "cell-metric-status", in: outlineView)
+                if let reading = device(for: item)?.reading,
+                    let value = item.metric.valueString(for: reading)
+                {
+                    cell.stringValue = value
+                    cell.textColor = .labelColor
+                }
+                else {
+                    cell.stringValue = "\u{2014}"
+                    cell.textColor = .secondaryLabelColor
+                }
+                return cell
+            case "menuBar":
+                let cellId = NSUserInterfaceItemIdentifier("cell-menu-bar")
+                let btn: NSButton
+                if let existing = outlineView.makeView(withIdentifier: cellId, owner: nil) as? NSButton {
+                    btn = existing
+                }
+                else {
+                    btn = NSButton(radioButtonWithTitle: "", target: self, action: #selector(menuBarMetricChanged(_:)))
+                    btn.identifier = cellId
+                }
+                btn.state = isMenuBarMetricSelected(item) ? .on : .off
+                return btn
+            default:
+                return nil
+        }
+    }
+
+    private func textCell(identifier: String, in outlineView: NSOutlineView) -> NSTextField {
+        let cellId = NSUserInterfaceItemIdentifier(identifier)
+        if let existing = outlineView.makeView(withIdentifier: cellId, owner: nil) as? NSTextField {
+            return existing
+        }
+
+        let cell = NSTextField(labelWithString: "")
+        cell.identifier = cellId
+        cell.lineBreakMode = .byTruncatingTail
+        cell.font = .systemFont(ofSize: 11)
+        return cell
+    }
+
     @objc private func notificationToggleChanged(_ sender: NSButton) {
-        let row = tableView.row(for: sender)
-        guard row >= 0, let devices = sensorManager?.sortedDevices, row < devices.count else { return }
-        NotificationPreferences.setEnabled(sender.state == .on, for: devices[row].device.id)
+        let row = outlineView.row(for: sender)
+        guard row >= 0,
+            let item = outlineView.item(atRow: row) as? DeviceOutlineItem
+        else { return }
+        NotificationPreferences.setEnabled(sender.state == .on, for: item.deviceId)
+    }
+
+    @objc private func menuBarMetricChanged(_ sender: NSButton) {
+        let row = outlineView.row(for: sender)
+        guard row >= 0,
+            let item = outlineView.item(atRow: row) as? MetricOutlineItem
+        else { return }
+
+        StatusBarDisplayPreferences.setSelection(deviceId: item.deviceId, metric: item.metric)
+        reloadOutlineData()
     }
 }
 

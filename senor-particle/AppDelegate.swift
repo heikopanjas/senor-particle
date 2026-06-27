@@ -37,6 +37,12 @@ import Cocoa
             name: .aranetScanStateDidChange,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleStatusBarDisplayPreferenceDidChange),
+            name: .statusBarDisplayPreferenceDidChange,
+            object: nil
+        )
 
         Task {
             do {
@@ -66,50 +72,66 @@ import Cocoa
 
     @objc private func handleScanStateChange() {
         if sensorManager?.isScanning == true {
-            statusItem?.button?.title = " \u{2026}"
-            statusItem?.button?.image = statusBarPlaceholderSymbol()
+            setStatusBarPlaceholder()
         }
         else if sensorManager?.sortedDevices.first(where: { $0.reading != nil }) == nil {
-            statusItem?.button?.title = " \u{2026}"
-            statusItem?.button?.image = statusBarPlaceholderSymbol()
+            setStatusBarPlaceholder()
+        }
+    }
+
+    @objc private func handleStatusBarDisplayPreferenceDidChange() {
+        MenuTrackingRefresh.perform { [weak self] in
+            self?.updateStatusBar()
         }
     }
 
     private func updateStatusBar() {
-        guard let statusItem,
-            let reading = sensorManager?.sortedDevices.first(where: { $0.reading != nil })?.reading
-        else { return }
+        guard let sensorManager else { return }
 
-        let title: String
-        if let co2 = reading.co2 {
-            title = " \(co2) ppm"
-        }
-        else if let rate = reading.radiationRate {
-            let uSv = rate.converted(to: .microsieverts)
-            title = String(format: " %.3f \u{00B5}Sv/h", uSv.value)
-        }
-        else if let temp = reading.temperature {
-            title = String(format: " %.1f\u{00B0}C", temp.value)
-        }
-        else {
+        if let selection = StatusBarDisplayPreferences.selection {
+            guard let device = sensorManager.devices[selection.deviceId],
+                let reading = device.reading,
+                let title = selection.metric.statusItemTitle(for: reading)
+            else {
+                setStatusBarPlaceholder()
+                return
+            }
+
+            applyStatusBarTitle(title)
             return
         }
 
+        guard let reading = sensorManager.sortedDevices.first(where: { $0.reading != nil })?.reading,
+            let metric = StatusBarDisplayMetric.defaultMetric(for: reading),
+            let title = metric.statusItemTitle(for: reading)
+        else {
+            setStatusBarPlaceholder()
+            return
+        }
+
+        applyStatusBarTitle(title)
+    }
+
+    private func applyStatusBarTitle(_ title: String) {
+        guard let statusItem else { return }
+
         statusItem.button?.title = title
-        statusItem.button?.image = statusBarSymbol(for: reading)
+        statusItem.button?.image = nil
         statusItem.length = NSStatusItem.variableLength
         statusItem.button?.needsDisplay = true
         statusItem.button?.displayIfNeeded()
         statusItem.button?.window?.displayIfNeeded()
     }
 
-    private func statusBarSymbol(for reading: AranetReading?) -> NSImage? {
-        guard let reading else {
-            return statusBarPlaceholderSymbol()
-        }
+    private func setStatusBarPlaceholder() {
+        guard let statusItem else { return }
 
-        let status = SensorSymbol.effectiveStatus(from: reading)
-        return SensorSymbol.image(for: reading.deviceType, status: status, pointSize: 13, weight: .black)
+        statusItem.button?.title = " \u{2026}"
+        statusItem.button?.image = statusBarPlaceholderSymbol()
+        statusItem.length = NSStatusItem.variableLength
+        statusItem.button?.needsDisplay = true
+        statusItem.button?.displayIfNeeded()
+        statusItem.button?.window?.displayIfNeeded()
     }
 
     private func statusBarPlaceholderSymbol() -> NSImage? {

@@ -120,9 +120,17 @@ Temporary Items
 *~
 
 # Build artifacts
+Build/
 *.app
 *.xcarchive
 buildServer.json
+CompilationCache.noindex/
+Index.noindex/
+Logs/
+ModuleCache.noindex/
+SDKStatCaches.noindex/
+SourcePackages/
+info.plist
 
 # Cursor or VSCode artifacts
 .vorg.db

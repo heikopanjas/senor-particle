@@ -221,26 +221,10 @@ class SensorDeviceView: NSView {
     private func readingRows(from reading: AranetReading?) -> [ReadingRow] {
         guard let reading else { return [] }
 
-        var rows: [ReadingRow] = []
-
-        if let co2 = reading.co2 { rows.append(ReadingRow(label: "CO\u{2082}", value: "\(co2) ppm")) }
-        if let temp = reading.temperature {
-            rows.append(ReadingRow(label: "Temperature", value: String(format: "%.1f \u{00B0}C", temp.value)))
+        return StatusBarDisplayMetric.availableMetrics(for: reading).compactMap { metric in
+            guard let value = metric.valueString(for: reading) else { return nil }
+            return ReadingRow(label: metric.label, value: value)
         }
-        if let humidity = reading.humidity { rows.append(ReadingRow(label: "Humidity", value: "\(humidity)%")) }
-        if let pressure = reading.pressure {
-            rows.append(ReadingRow(label: "Pressure", value: String(format: "%.1f hPa", pressure.value)))
-        }
-        if let rate = reading.radiationRate {
-            let uSv = rate.converted(to: .microsieverts)
-            rows.append(ReadingRow(label: "Dose rate", value: String(format: "%.3f \u{00B5}Sv/h", uSv.value)))
-        }
-        if let total = reading.radiationTotal {
-            let uSv = total.converted(to: .microsieverts)
-            rows.append(ReadingRow(label: "Total dose", value: String(format: "%.2f \u{00B5}Sv", uSv.value)))
-        }
-
-        return rows
     }
 
     private static let timestampFormatter: DateFormatter = {

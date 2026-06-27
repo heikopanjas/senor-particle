@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2026-05-20
+**Last updated:** 2026-06-27
 
 <!-- {mission} -->
 
@@ -96,6 +96,8 @@ When initializing a session or analyzing the workspace, refer to instruction fil
 - **Periodic Updates**: Schedule readings based on device update intervals (AranetKit provides timing info)
 - **Error Handling**: Provide clear user feedback for Bluetooth connectivity and sensor communication issues
 - **Status Notifications**: Use `StatusNotificationCopy` for Carrot Weather-inspired notification text on status color transitions. Four configurable personality levels (`NotificationPersonality`: Professional, Friendly, Snarky, Overkill) in Settings. Copy is data-first (metric + plain-language severity), device-type aware (CO₂, radiation, radon), and direction-aware (worsening vs improving). Stored in Swift static tables in `StatusNotificationCopy.swift`
+- **Status Item Display Selection**: The macOS menu bar status item can be pinned to one device metric from Settings > Devices. Store the selected device UUID and `StatusBarDisplayMetric` in `StatusBarDisplayPreferences`, post `Notification.Name.statusBarDisplayPreferenceDidChange` on changes, and refresh the status item through `MenuTrackingRefresh`. If no explicit selection exists, preserve the default first-reading fallback order: CO₂, radiation dose rate, then temperature. When a value is displayed, the status item is text-only; keep sensor icons out of the value display
+- **Devices Settings Hierarchy**: Keep the Devices settings surface table-based, but use `NSOutlineView` when showing hierarchical device content. Device rows stay top-level with editable name and notification controls; metric rows are children used for menu bar display selection
 - **Update Cycle Progress**: Each sensor in the menu shows an `UpdateCycleProgressView` below the timestamp. Cycle position = `reading.ago at receive + time since lastUpdated`, repeating every interval via modulo while the menu stays open. Fill color fades from light green opaque to light green at 37% opacity. New readings re-anchor via `MonitoredDevice.updateSequence`. After a configurable number of missed intervals without a reading (**Degraded situation**, default 3, Settings > General), the bar shows full opaque dark red. UI refresh during menu tracking uses `MenuTrackingRefresh` (`.common` run loop); reading delivery relies on AranetKit monitor timers and `Notification.Name.aranetReadingDidUpdate`
 
 ### Security & Safety
@@ -1492,6 +1494,7 @@ open senor-particle.xcodeproj
 ### Development (Command Line)
 
 Always pass `-destination "generic/platform=macOS"` to avoid ambiguous destination warnings.
+Debug builds write the app bundle to `Build/Products/Debug/Senor Particle.app` inside the repository.
 
 ```bash
 # Build the project (debug)
@@ -1730,3 +1733,10 @@ After making ANY code changes:
 - **Menu tracking UI refresh**: Added `MenuTrackingRefresh` to schedule status bar and menu view updates on `RunLoop.main` `.common` mode. `MenuManager` observes `Notification.Name.aranetReadingDidUpdate` and forces view redraw after in-place configure so sensor values update while the menu is open
 - **In-place menu row updates**: `SensorDeviceView` reuses persistent metric row fields instead of removing and recreating subviews on each reading; AppKit does not repaint rebuilt subviews during menu tracking. `MenuManager` reassigns `NSMenuItem.view` after updates to force menu item redraw
 - **Menu-open sensor polling**: Root cause of stale menu/status values while menu open is AranetKit monitor timers using default run loop mode (paused during menu tracking). Fixed upstream in AranetKit; app listens to `Notification.Name.aranetReadingDidUpdate` only
+
+### 2026-06-27
+
+- **Status item metric selector**: Added a Settings > Devices outline hierarchy where each sensor expands to selectable metric rows. The selected device UUID and metric are persisted through `StatusBarDisplayPreferences`, and `AppDelegate` refreshes the status item on preference changes so users can pin the menu bar display to a specific sensor value
+- **Shared metric formatting**: Centralized displayable Aranet metrics in `StatusBarDisplayMetric` so status item titles, Settings metric rows, and menu dropdown readings share labels and formatting, including radon concentration
+- **Debug build output path**: Set the target Debug `CONFIGURATION_BUILD_DIR` to `$(PROJECT_DIR)/Build/Products/Debug` so command-line and Xcode debug builds produce `Build/Products/Debug/Senor Particle.app` in the repository. Keep Swift, library, and framework search paths pointed at `$(BUILD_DIR)/$(CONFIGURATION)` so local Swift package products remain discoverable
+- **Text-only status item values**: Removed sensor icons from the menu bar value display so selected metrics render as text only, while placeholder states can continue to use the scanning symbol
