@@ -17,6 +17,7 @@ character limits, conventional commit types, and examples.
 ## Commit Protocol (CRITICAL)
 
 - **NEVER commit automatically** - always wait for explicit confirmation
+- **NEVER include agent co-authorship trailers** in commit messages
 
 Whenever asked to commit changes:
 

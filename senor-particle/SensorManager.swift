@@ -37,15 +37,15 @@ class SensorManager {
         NotificationCenter.default.removeObserver(self)
     }
 
-    func scan() async throws {
-        isScanning = true
-        defer { isScanning = false }
+    func scan() async throws -> Void {
+        self.isScanning = true
+        defer { self.isScanning = false }
 
-        let found = try await client.scan(timeout: ScanPreferences.timeout)
-        for device in found where devices[device.id] == nil { devices[device.id] = MonitoredDevice(device: device) }
+        let found = try await self.client.scan(timeout: ScanPreferences.timeout)
+        for device in found where self.devices[device.id] == nil { self.devices[device.id] = MonitoredDevice(device: device) }
     }
 
-    func rescan() {
+    func rescan() -> Void {
         Task { @MainActor [weak self] in
             guard let self else { return }
             do {
@@ -56,47 +56,47 @@ class SensorManager {
         }
     }
 
-    func startMonitoring() {
-        for (id, monitored) in devices where monitoringTasks[id] == nil {
-            monitoringTasks[id] = Task { @MainActor [weak self] in
+    func startMonitoring() -> Void {
+        for (id, monitored) in self.devices where self.monitoringTasks[id] == nil {
+            self.monitoringTasks[id] = Task { @MainActor [weak self] in
                 await self?.monitorWithRetry(id: id, device: monitored.device)
             }
         }
     }
 
-    func stopMonitoring() {
-        for (_, task) in monitoringTasks { task.cancel() }
-        monitoringTasks.removeAll()
+    func stopMonitoring() -> Void {
+        for (_, task) in self.monitoringTasks { task.cancel() }
+        self.monitoringTasks.removeAll()
     }
 
-    var sortedDevices: [MonitoredDevice] { devices.values.sorted { $0.device.name < $1.device.name } }
+    var sortedDevices: [MonitoredDevice] { return self.devices.values.sorted { $0.device.name < $1.device.name } }
 
     // MARK: - Private
 
-    @objc private func handleReadingDidUpdate(_ notification: Notification) {
+    @objc private func handleReadingDidUpdate(_ notification: Notification) -> Void {
         guard let device = notification.userInfo?[AranetNotificationKey.device] as? AranetDevice,
             let reading = notification.userInfo?[AranetNotificationKey.reading] as? AranetReading
         else { return }
 
         let receivedAt = notification.userInfo?[AranetNotificationKey.receivedAt] as? Date ?? Date()
 
-        if devices[device.id] == nil {
-            devices[device.id] = MonitoredDevice(device: device)
+        if self.devices[device.id] == nil {
+            self.devices[device.id] = MonitoredDevice(device: device)
         }
 
-        devices[device.id]?.reading = reading
-        devices[device.id]?.lastUpdated = receivedAt
-        devices[device.id]?.updateSequence &+= 1
+        self.devices[device.id]?.reading = reading
+        self.devices[device.id]?.lastUpdated = receivedAt
+        self.devices[device.id]?.updateSequence &+= 1
     }
 
-    private func monitorWithRetry(id: UUID, device: AranetDevice) async {
+    private func monitorWithRetry(id: UUID, device: AranetDevice) async -> Void {
         var retryCount = 0
 
         while Task.isCancelled == false {
-            let stream = client.monitor(from: device)
+            let stream = self.client.monitor(from: device)
 
             for await result in stream {
-                if Task.isCancelled { return }
+                if Task.isCancelled == true { return }
 
                 switch result {
                     case .success: break
@@ -104,18 +104,18 @@ class SensorManager {
                 }
             }
 
-            if Task.isCancelled { return }
+            if Task.isCancelled == true { return }
 
             retryCount += 1
-            if retryCount > maxRetries {
-                NSLog("[SensorManager] Giving up on %@ after %d retries", device.name, maxRetries)
+            if retryCount > self.maxRetries {
+                NSLog("[SensorManager] Giving up on %@ after %d retries", device.name, self.maxRetries)
                 return
             }
 
-            let delay = baseRetryDelay * pow(2.0, Double(retryCount - 1))
+            let delay = self.baseRetryDelay * pow(2.0, Double(retryCount - 1))
             NSLog(
                 "[SensorManager] Reconnecting to %@ in %.0fs (attempt %d/%d)", device.name, delay, retryCount,
-                maxRetries)
+                self.maxRetries)
             try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
         }
     }

@@ -15,15 +15,15 @@ class MenuManager: NSObject, NSMenuDelegate {
         self.sensorManager = sensorManager
         super.init()
 
-        menu.delegate = self
-        menu.addItem(NSMenuItem.separator())
+        self.menu.delegate = self
+        self.menu.addItem(NSMenuItem.separator())
 
         let rescan = NSMenuItem(title: "Rescan", action: #selector(rescan), keyEquivalent: "r")
         rescan.target = self
-        menu.addItem(rescan)
-        rescanItem = rescan
+        self.menu.addItem(rescan)
+        self.rescanItem = rescan
 
-        menu.addItem(NSMenuItem.separator())
+        self.menu.addItem(NSMenuItem.separator())
 
         let settingsItem = NSMenuItem(
             title: "Settings\u{2026}",
@@ -31,11 +31,11 @@ class MenuManager: NSObject, NSMenuDelegate {
             keyEquivalent: ","
         )
         settingsItem.target = self
-        menu.addItem(settingsItem)
+        self.menu.addItem(settingsItem)
 
-        menu.addItem(NSMenuItem.separator())
+        self.menu.addItem(NSMenuItem.separator())
 
-        menu.addItem(NSMenuItem(title: "Quit Se\u{00F1}or Particle", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        self.menu.addItem(NSMenuItem(title: "Quit Se\u{00F1}or Particle", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
         NotificationCenter.default.addObserver(
             self,
@@ -49,75 +49,75 @@ class MenuManager: NSObject, NSMenuDelegate {
         NotificationCenter.default.removeObserver(self)
     }
 
-    func refreshIfNeeded() {
-        guard isOpen, sensorManager != nil else { return }
-        refreshIfNeededOnMainThread()
+    func refreshIfNeeded() -> Void {
+        guard self.isOpen == true, self.sensorManager != nil else { return }
+        self.refreshIfNeededOnMainThread()
     }
 
-    @objc private func handleReadingDidUpdate() {
+    @objc private func handleReadingDidUpdate() -> Void {
         MenuTrackingRefresh.perform { [weak self] in
             self?.refreshIfNeededOnMainThread()
         }
     }
 
-    private func refreshIfNeededOnMainThread() {
-        guard isOpen, let sensorManager else { return }
+    private func refreshIfNeededOnMainThread() -> Void {
+        guard self.isOpen == true, let sensorManager = self.sensorManager else { return }
 
-        if sensorManager.isScanning || sensorManager.sortedDevices.isEmpty {
-            refreshDeviceItems()
+        if sensorManager.isScanning == true || sensorManager.sortedDevices.isEmpty == true {
+            self.refreshDeviceItems()
             return
         }
 
         let order = sensorManager.sortedDevices.map { $0.device.id }
-        if order == deviceOrder {
-            updateDeviceViewsInPlace()
+        if order == self.deviceOrder {
+            self.updateDeviceViewsInPlace()
         }
         else {
-            refreshDeviceItems()
+            self.refreshDeviceItems()
         }
     }
 
     // MARK: - NSMenuDelegate
 
-    func menuWillOpen(_ menu: NSMenu) {
-        isOpen = true
-        refreshDeviceItems()
+    func menuWillOpen(_ menu: NSMenu) -> Void {
+        self.isOpen = true
+        self.refreshDeviceItems()
     }
 
-    func menuDidClose(_ menu: NSMenu) {
-        isOpen = false
-        clearDeviceItems()
+    func menuDidClose(_ menu: NSMenu) -> Void {
+        self.isOpen = false
+        self.clearDeviceItems()
     }
 
     // MARK: - Private
 
-    private func refreshDeviceItems() {
-        clearDeviceItems()
+    private func refreshDeviceItems() -> Void {
+        self.clearDeviceItems()
 
-        guard let sensorManager else { return }
+        guard let sensorManager = self.sensorManager else { return }
 
-        rescanItem?.isEnabled = !sensorManager.isScanning
+        self.rescanItem?.isEnabled = sensorManager.isScanning == false
 
-        if sensorManager.isScanning {
+        if sensorManager.isScanning == true {
             let item = NSMenuItem(title: "Scanning for devices...", action: nil, keyEquivalent: "")
             item.isEnabled = false
-            menu.insertItem(item, at: 0)
+            self.menu.insertItem(item, at: 0)
             return
         }
 
         let devices = sensorManager.sortedDevices
 
-        if devices.isEmpty {
+        if devices.isEmpty == true {
             let item = NSMenuItem(title: "No devices found", action: nil, keyEquivalent: "")
             item.isEnabled = false
-            menu.insertItem(item, at: 0)
+            self.menu.insertItem(item, at: 0)
             return
         }
 
         var insertIndex = 0
         for (i, device) in devices.enumerated() {
             if i > 0 {
-                menu.insertItem(.separator(), at: insertIndex)
+                self.menu.insertItem(.separator(), at: insertIndex)
                 insertIndex += 1
             }
             let item = NSMenuItem()
@@ -129,50 +129,50 @@ class MenuManager: NSObject, NSMenuDelegate {
                 updateSequence: device.updateSequence
             )
             item.view = view
-            menu.insertItem(item, at: insertIndex)
-            deviceEntries[device.device.id] = (item, view)
-            deviceOrder.append(device.device.id)
+            self.menu.insertItem(item, at: insertIndex)
+            self.deviceEntries[device.device.id] = (item, view)
+            self.deviceOrder.append(device.device.id)
             insertIndex += 1
         }
     }
 
-    private func updateDeviceViewsInPlace() {
-        guard let sensorManager else { return }
+    private func updateDeviceViewsInPlace() -> Void {
+        guard let sensorManager = self.sensorManager else { return }
 
         for device in sensorManager.sortedDevices {
-            guard let (item, view) = deviceEntries[device.device.id] else { continue }
+            guard let (item, view) = self.deviceEntries[device.device.id] else { continue }
             view.configure(
                 device: device.device,
                 reading: device.reading,
                 lastUpdated: device.lastUpdated,
                 updateSequence: device.updateSequence
             )
-            reattachMenuItemView(item, view: view)
+            self.reattachMenuItemView(item, view: view)
         }
-        menu.update()
+        self.menu.update()
     }
 
     /// Reassigns the custom view so AppKit repaints menu item content during menu tracking.
-    private func reattachMenuItemView(_ item: NSMenuItem, view: SensorDeviceView) {
+    private func reattachMenuItemView(_ item: NSMenuItem, view: SensorDeviceView) -> Void {
         item.view = nil
         item.view = view
     }
 
-    @objc private func rescan() {
-        sensorManager?.rescan()
+    @objc private func rescan() -> Void {
+        self.sensorManager?.rescan()
     }
 
-    @objc private func openSettings() {
-        if settingsWindowController == nil, let sensorManager {
-            settingsWindowController = SettingsWindowController(sensorManager: sensorManager)
+    @objc private func openSettings() -> Void {
+        if self.settingsWindowController == nil, let sensorManager = self.sensorManager {
+            self.settingsWindowController = SettingsWindowController(sensorManager: sensorManager)
         }
-        settingsWindowController?.showAndBringToFront()
+        self.settingsWindowController?.showAndBringToFront()
     }
 
-    private func clearDeviceItems() {
+    private func clearDeviceItems() -> Void {
         let fixedItemCount = 6
-        while menu.items.count > fixedItemCount { menu.removeItem(at: 0) }
-        deviceEntries.removeAll()
-        deviceOrder.removeAll()
+        while self.menu.items.count > fixedItemCount { self.menu.removeItem(at: 0) }
+        self.deviceEntries.removeAll()
+        self.deviceOrder.removeAll()
     }
 }

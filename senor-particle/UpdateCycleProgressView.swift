@@ -18,113 +18,115 @@ class UpdateCycleProgressView: NSView {
     private static let lightGreenFadedAlpha: CGFloat = 0.37
     private static let darkRed = NSColor(red: 0.55, green: 0.10, blue: 0.10, alpha: 1.0)
 
-    override var isFlipped: Bool { true }
+    override var isFlipped: Bool { return true }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        setupSubviews()
+        self.setupSubviews()
     }
 
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    deinit {
-        timer?.invalidate()
+    isolated deinit {
+        self.timer?.invalidate()
     }
 
-    func configure(lastUpdated: Date, reading: AranetReading, updateSequence: UInt) {
+    func configure(lastUpdated: Date, reading: AranetReading, updateSequence: UInt) -> Void {
         let newCycle = updateSequence != self.updateSequence
         self.updateSequence = updateSequence
-        interval = Self.interval(for: reading)
+        self.interval = Self.interval(for: reading)
 
-        if newCycle {
-            cycleAnchor = lastUpdated
-            cycleStartAgo = TimeInterval(reading.ago ?? 0)
+        if newCycle == true {
+            self.cycleAnchor = lastUpdated
+            self.cycleStartAgo = TimeInterval(reading.ago ?? 0)
         }
 
-        isHidden = false
-        refresh()
-        startTimer()
+        self.isHidden = false
+        self.refresh()
+        self.startTimer()
     }
 
-    func clear() {
-        cycleAnchor = nil
-        cycleStartAgo = 0
-        updateSequence = 0
-        timer?.invalidate()
-        timer = nil
-        isHidden = true
-        fillView.frame.size.width = 0
+    func clear() -> Void {
+        self.cycleAnchor = nil
+        self.cycleStartAgo = 0
+        self.updateSequence = 0
+        self.timer?.invalidate()
+        self.timer = nil
+        self.isHidden = true
+        self.fillView.frame.size.width = 0
     }
 
-    override func setFrameSize(_ newSize: NSSize) {
+    override func setFrameSize(_ newSize: NSSize) -> Void {
         super.setFrameSize(newSize)
-        layoutBar(progress: currentProgress())
+        self.layoutBar(progress: self.currentProgress())
     }
 
     // MARK: - Private
 
-    private func setupSubviews() {
-        trackView.wantsLayer = true
-        trackView.layer?.backgroundColor = NSColor.separatorColor.cgColor
-        trackView.layer?.cornerRadius = Self.cornerRadius
-        trackView.layer?.masksToBounds = true
-        addSubview(trackView)
+    private func setupSubviews() -> Void {
+        self.trackView.wantsLayer = true
+        self.trackView.layer?.backgroundColor = NSColor.separatorColor.cgColor
+        self.trackView.layer?.cornerRadius = Self.cornerRadius
+        self.trackView.layer?.masksToBounds = true
+        self.addSubview(self.trackView)
 
-        fillView.wantsLayer = true
-        fillView.layer?.cornerRadius = Self.cornerRadius
-        fillView.layer?.masksToBounds = true
-        trackView.addSubview(fillView)
+        self.fillView.wantsLayer = true
+        self.fillView.layer?.cornerRadius = Self.cornerRadius
+        self.fillView.layer?.masksToBounds = true
+        self.trackView.addSubview(self.fillView)
 
-        isHidden = true
+        self.isHidden = true
     }
 
-    private func startTimer() {
-        timer?.invalidate()
+    private func startTimer() -> Void {
+        self.timer?.invalidate()
         let newTimer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.refresh()
+            Task { @MainActor [weak self] in
+                self?.refresh()
+            }
         }
         RunLoop.main.add(newTimer, forMode: .common)
-        timer = newTimer
+        self.timer = newTimer
     }
 
-    private func refresh() {
-        guard let cycleAnchor else { return }
+    private func refresh() -> Void {
+        guard let cycleAnchor = self.cycleAnchor else { return }
 
-        let elapsed = cycleStartAgo + Date().timeIntervalSince(cycleAnchor)
+        let elapsed = self.cycleStartAgo + Date().timeIntervalSince(cycleAnchor)
 
-        if elapsed >= interval * Double(degradedCycleThreshold) {
-            fillView.layer?.backgroundColor = Self.darkRed.cgColor
-            layoutBar(progress: 1)
+        if elapsed >= self.interval * Double(self.degradedCycleThreshold) {
+            self.fillView.layer?.backgroundColor = Self.darkRed.cgColor
+            self.layoutBar(progress: 1)
         }
         else {
-            let progress = cycleProgress(elapsed: elapsed)
-            fillView.layer?.backgroundColor = Self.normalColor(progress: progress).cgColor
-            layoutBar(progress: progress)
+            let progress = self.cycleProgress(elapsed: elapsed)
+            self.fillView.layer?.backgroundColor = Self.normalColor(progress: progress).cgColor
+            self.layoutBar(progress: progress)
         }
 
-        trackView.needsDisplay = true
-        fillView.needsDisplay = true
+        self.trackView.needsDisplay = true
+        self.fillView.needsDisplay = true
     }
 
     /// Maps total elapsed time into a repeating 0...1 progress within each interval.
     private func cycleProgress(elapsed: TimeInterval) -> Double {
-        let position = elapsed.truncatingRemainder(dividingBy: interval)
-        return position / interval
+        let position = elapsed.truncatingRemainder(dividingBy: self.interval)
+        return position / self.interval
     }
 
     private func currentProgress() -> Double {
-        guard let cycleAnchor else { return 0 }
+        guard let cycleAnchor = self.cycleAnchor else { return 0 }
 
-        let elapsed = cycleStartAgo + Date().timeIntervalSince(cycleAnchor)
-        if elapsed >= interval * Double(degradedCycleThreshold) { return 1 }
-        return cycleProgress(elapsed: elapsed)
+        let elapsed = self.cycleStartAgo + Date().timeIntervalSince(cycleAnchor)
+        if elapsed >= self.interval * Double(self.degradedCycleThreshold) { return 1 }
+        return self.cycleProgress(elapsed: elapsed)
     }
 
-    private func layoutBar(progress: Double) {
-        guard frame.width > 0, frame.height > 0 else { return }
+    private func layoutBar(progress: Double) -> Void {
+        guard self.frame.width > 0, self.frame.height > 0 else { return }
 
-        trackView.frame = bounds
-        fillView.frame = NSRect(x: 0, y: 0, width: bounds.width * progress, height: bounds.height)
+        self.trackView.frame = self.bounds
+        self.fillView.frame = NSRect(x: 0, y: 0, width: self.bounds.width * progress, height: self.bounds.height)
     }
 
     private static func interval(for reading: AranetReading) -> TimeInterval {
@@ -132,16 +134,16 @@ class UpdateCycleProgressView: NSView {
     }
 
     private var degradedCycleThreshold: Int {
-        DegradedSituationPreferences.cycles
+        return DegradedSituationPreferences.cycles
     }
 
     private static func normalColor(progress: Double) -> NSColor {
         let t = min(max(progress, 0), 1)
-        let alpha = lightGreen.alphaComponent + (lightGreenFadedAlpha - lightGreen.alphaComponent) * t
+        let alpha = Self.lightGreen.alphaComponent + (Self.lightGreenFadedAlpha - Self.lightGreen.alphaComponent) * t
         return NSColor(
-            red: lightGreen.redComponent,
-            green: lightGreen.greenComponent,
-            blue: lightGreen.blueComponent,
+            red: Self.lightGreen.redComponent,
+            green: Self.lightGreen.greenComponent,
+            blue: Self.lightGreen.blueComponent,
             alpha: alpha
         )
     }

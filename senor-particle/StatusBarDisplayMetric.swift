@@ -39,11 +39,11 @@ enum StatusBarDisplayPreferences {
         return StatusBarDisplaySelection(deviceId: deviceId, metrics: metrics)
     }
 
-    static func setSelection(deviceId: UUID, metric: StatusBarDisplayMetric) {
-        setSelection(deviceId: deviceId, metrics: [metric])
+    static func setSelection(deviceId: UUID, metric: StatusBarDisplayMetric) -> Void {
+        Self.setSelection(deviceId: deviceId, metrics: [metric])
     }
 
-    static func setSelection(deviceId: UUID, metrics: [StatusBarDisplayMetric]) {
+    static func setSelection(deviceId: UUID, metrics: [StatusBarDisplayMetric]) -> Void {
         var uniqueMetrics: [StatusBarDisplayMetric] = []
         for metric in metrics where uniqueMetrics.contains(metric) == false {
             uniqueMetrics.append(metric)
@@ -51,7 +51,7 @@ enum StatusBarDisplayPreferences {
         }
 
         guard uniqueMetrics.isEmpty == false else {
-            clearSelection()
+            Self.clearSelection()
             return
         }
 
@@ -61,9 +61,9 @@ enum StatusBarDisplayPreferences {
         NotificationCenter.default.post(name: .statusBarDisplayPreferenceDidChange, object: nil)
     }
 
-    static func toggleSelection(deviceId: UUID, metric: StatusBarDisplayMetric) {
+    static func toggleSelection(deviceId: UUID, metric: StatusBarDisplayMetric) -> Void {
         guard let selection, selection.deviceId == deviceId else {
-            setSelection(deviceId: deviceId, metric: metric)
+            Self.setSelection(deviceId: deviceId, metric: metric)
             return
         }
 
@@ -75,7 +75,7 @@ enum StatusBarDisplayPreferences {
             metrics.append(metric)
         }
 
-        setSelection(deviceId: deviceId, metrics: metrics)
+        Self.setSelection(deviceId: deviceId, metrics: metrics)
     }
 
     static func canSelect(deviceId: UUID, metric: StatusBarDisplayMetric) -> Bool {
@@ -129,11 +129,11 @@ enum StatusBarDisplayPreferences {
         return selection.deviceId != deviceId
     }
 
-    static func postChangeNotification() {
+    static func postChangeNotification() -> Void {
         NotificationCenter.default.post(name: .statusBarDisplayPreferenceDidChange, object: nil)
     }
 
-    static func clearSelection() {
+    static func clearSelection() -> Void {
         UserDefaults.standard.removeObject(forKey: deviceIdKey)
         UserDefaults.standard.removeObject(forKey: metricsKey)
         UserDefaults.standard.removeObject(forKey: legacyMetricKey)

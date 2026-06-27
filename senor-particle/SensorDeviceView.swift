@@ -15,7 +15,7 @@ class SensorDeviceView: NSView {
     private let updateCycleProgress = UpdateCycleProgressView()
     private var metricRows: [MetricRow] = []
 
-    override var isFlipped: Bool { true }
+    override var isFlipped: Bool { return true }
 
     private let badgeSize: CGFloat = 24
     private let iconViewSize: CGFloat = 16
@@ -35,133 +35,133 @@ class SensorDeviceView: NSView {
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        setupFixedSubviews()
+        self.setupFixedSubviews()
     }
 
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     // MARK: - Configuration
 
-    func configure(device: AranetDevice, reading: AranetReading?, lastUpdated: Date? = nil, updateSequence: UInt = 0) {
-        nameLabel.stringValue =
+    func configure(device: AranetDevice, reading: AranetReading?, lastUpdated: Date? = nil, updateSequence: UInt = 0) -> Void {
+        self.nameLabel.stringValue =
             DeviceNamePreferences.name(for: device.id)
             ?? reading?.name
             ?? device.name
 
         let batteryWidth: CGFloat = 56
-        batteryView.frame = NSRect(
-            x: frame.width - rightPadding - batteryWidth, y: topPadding, width: batteryWidth, height: nameRowHeight)
+        self.batteryView.frame = NSRect(
+            x: self.frame.width - self.rightPadding - batteryWidth, y: self.topPadding, width: batteryWidth, height: self.nameRowHeight)
 
-        nameLabel.frame = NSRect(
-            x: contentLeft, y: topPadding, width: frame.width - contentLeft - rightPadding - batteryWidth - 4,
-            height: nameRowHeight)
+        self.nameLabel.frame = NSRect(
+            x: self.contentLeft, y: self.topPadding, width: self.frame.width - self.contentLeft - self.rightPadding - batteryWidth - 4,
+            height: self.nameRowHeight)
 
         let status = SensorSymbol.effectiveStatus(from: reading)
 
         if let reading {
-            iconView.image = SensorSymbol.image(for: reading.deviceType, status: status, pointSize: iconSymbolPointSize)
-            iconView.contentTintColor = .white
-            iconBackgroundView.layer?.backgroundColor = backgroundForStatus(status).cgColor
-            batteryView.configure(battery: Int(reading.battery))
+            self.iconView.image = SensorSymbol.image(for: reading.deviceType, status: status, pointSize: self.iconSymbolPointSize)
+            self.iconView.contentTintColor = .white
+            self.iconBackgroundView.layer?.backgroundColor = self.backgroundForStatus(status).cgColor
+            self.batteryView.configure(battery: Int(reading.battery))
         }
         else {
-            iconView.image = SensorSymbol.scanningImage(pointSize: iconSymbolPointSize, weight: .semibold)
-            iconView.contentTintColor = .white
-            iconBackgroundView.layer?.backgroundColor = NSColor.tertiaryLabelColor.cgColor
-            batteryView.clear()
+            self.iconView.image = SensorSymbol.scanningImage(pointSize: self.iconSymbolPointSize, weight: .semibold)
+            self.iconView.contentTintColor = .white
+            self.iconBackgroundView.layer?.backgroundColor = NSColor.tertiaryLabelColor.cgColor
+            self.batteryView.clear()
         }
 
-        let rows = readingRows(from: reading)
-        ensureMetricRows(count: rows.count)
+        let rows = self.readingRows(from: reading)
+        self.ensureMetricRows(count: rows.count)
 
-        let valueX = contentLeft + labelWidth
-        let valueWidth = frame.width - valueX - rightPadding
-        var y = topPadding + nameRowHeight + nameBottomGap
+        let valueX = self.contentLeft + self.labelWidth
+        let valueWidth = self.frame.width - valueX - self.rightPadding
+        var y = self.topPadding + self.nameRowHeight + self.nameBottomGap
 
         for (index, row) in rows.enumerated() {
-            let metricRow = metricRows[index]
+            let metricRow = self.metricRows[index]
             metricRow.labelField.stringValue = row.label
             metricRow.valueField.stringValue = row.value
-            metricRow.labelField.frame = NSRect(x: contentLeft, y: y, width: labelWidth, height: rowHeight)
-            metricRow.valueField.frame = NSRect(x: valueX, y: y, width: valueWidth, height: rowHeight)
+            metricRow.labelField.frame = NSRect(x: self.contentLeft, y: y, width: self.labelWidth, height: self.rowHeight)
+            metricRow.valueField.frame = NSRect(x: valueX, y: y, width: valueWidth, height: self.rowHeight)
             metricRow.labelField.isHidden = false
             metricRow.valueField.isHidden = false
-            y += rowHeight + rowSpacing
+            y += self.rowHeight + self.rowSpacing
         }
 
-        for index in rows.count ..< metricRows.count {
-            metricRows[index].labelField.isHidden = true
-            metricRows[index].valueField.isHidden = true
+        for index in rows.count ..< self.metricRows.count {
+            self.metricRows[index].labelField.isHidden = true
+            self.metricRows[index].valueField.isHidden = true
         }
 
         if let lastUpdated, let reading {
             y += 2
-            timestampField.stringValue = formatTimestamp(sensorMeasurementDate(receivedAt: lastUpdated, reading: reading))
-            timestampField.frame = NSRect(x: contentLeft, y: y, width: frame.width - contentLeft - rightPadding, height: 14)
-            timestampField.isHidden = false
+            self.timestampField.stringValue = self.formatTimestamp(self.sensorMeasurementDate(receivedAt: lastUpdated, reading: reading))
+            self.timestampField.frame = NSRect(x: self.contentLeft, y: y, width: self.frame.width - self.contentLeft - self.rightPadding, height: 14)
+            self.timestampField.isHidden = false
             y += 14
 
-            y += progressTopGap
-            let progressWidth = frame.width - contentLeft - rightPadding
-            updateCycleProgress.frame = NSRect(x: contentLeft, y: y, width: progressWidth, height: progressHeight)
-            updateCycleProgress.configure(
+            y += self.progressTopGap
+            let progressWidth = self.frame.width - self.contentLeft - self.rightPadding
+            self.updateCycleProgress.frame = NSRect(x: self.contentLeft, y: y, width: progressWidth, height: self.progressHeight)
+            self.updateCycleProgress.configure(
                 lastUpdated: lastUpdated, reading: reading, updateSequence: updateSequence)
-            y += progressHeight
+            y += self.progressHeight
         }
         else {
-            timestampField.isHidden = true
-            updateCycleProgress.clear()
+            self.timestampField.isHidden = true
+            self.updateCycleProgress.clear()
         }
 
-        let totalHeight = y - rowSpacing + bottomPadding
-        setFrameSize(NSSize(width: frame.width, height: totalHeight))
+        let totalHeight = y - self.rowSpacing + self.bottomPadding
+        self.setFrameSize(NSSize(width: self.frame.width, height: totalHeight))
 
-        let badgeY = topPadding + (nameRowHeight - badgeSize) / 2
-        layoutIconBadge(at: badgeY, deviceType: reading?.deviceType)
+        let badgeY = self.topPadding + (self.nameRowHeight - self.badgeSize) / 2
+        self.layoutIconBadge(at: badgeY, deviceType: reading?.deviceType)
 
-        invalidateDisplay()
+        self.invalidateDisplay()
     }
 
-    private func layoutIconBadge(at badgeY: CGFloat, deviceType: AranetDeviceType?) {
-        let badgeFrame = NSRect(x: leftPadding, y: badgeY, width: badgeSize, height: badgeSize)
-        iconBackgroundView.frame = badgeFrame
-        iconBackgroundView.layer?.cornerRadius = badgeSize / 2
+    private func layoutIconBadge(at badgeY: CGFloat, deviceType: AranetDeviceType?) -> Void {
+        let badgeFrame = NSRect(x: self.leftPadding, y: badgeY, width: self.badgeSize, height: self.badgeSize)
+        self.iconBackgroundView.frame = badgeFrame
+        self.iconBackgroundView.layer?.cornerRadius = self.badgeSize / 2
 
-        let iconInset = (badgeSize - iconViewSize) / 2
+        let iconInset = (self.badgeSize - self.iconViewSize) / 2
         let offset = deviceType.map { SensorSymbol.alignmentOffset(for: $0) } ?? .zero
-        iconView.frame = NSRect(
+        self.iconView.frame = NSRect(
             x: badgeFrame.minX + iconInset + offset.width,
             y: badgeFrame.minY + iconInset + offset.height,
-            width: iconViewSize,
-            height: iconViewSize
+            width: self.iconViewSize,
+            height: self.iconViewSize
         )
     }
 
     // MARK: - Setup
 
-    private func setupFixedSubviews() {
-        iconBackgroundView.wantsLayer = true
-        iconBackgroundView.layer?.masksToBounds = true
-        addSubview(iconBackgroundView)
+    private func setupFixedSubviews() -> Void {
+        self.iconBackgroundView.wantsLayer = true
+        self.iconBackgroundView.layer?.masksToBounds = true
+        self.addSubview(self.iconBackgroundView)
 
-        iconView.imageScaling = .scaleProportionallyDown
-        iconView.imageAlignment = .alignCenter
-        addSubview(iconView)
+        self.iconView.imageScaling = .scaleProportionallyDown
+        self.iconView.imageAlignment = .alignCenter
+        self.addSubview(self.iconView)
 
-        configureLabel(nameLabel, size: 13, weight: .semibold)
-        addSubview(nameLabel)
+        self.configureLabel(self.nameLabel, size: 13, weight: .semibold)
+        self.addSubview(self.nameLabel)
 
-        addSubview(batteryView)
+        self.addSubview(self.batteryView)
 
-        configureLabel(timestampField, size: 10, weight: .regular)
-        timestampField.textColor = .secondaryLabelColor
-        timestampField.isHidden = true
-        addSubview(timestampField)
+        self.configureLabel(self.timestampField, size: 10, weight: .regular)
+        self.timestampField.textColor = .secondaryLabelColor
+        self.timestampField.isHidden = true
+        self.addSubview(self.timestampField)
 
-        addSubview(updateCycleProgress)
+        self.addSubview(self.updateCycleProgress)
     }
 
-    private func configureLabel(_ label: NSTextField, size: CGFloat, weight: NSFont.Weight) {
+    private func configureLabel(_ label: NSTextField, size: CGFloat, weight: NSFont.Weight) -> Void {
         label.applyPlainLabelStyle()
         label.font = .systemFont(ofSize: size, weight: weight)
         label.lineBreakMode = .byTruncatingTail
@@ -173,39 +173,39 @@ class SensorDeviceView: NSView {
         return label
     }
 
-    private func ensureMetricRows(count: Int) {
-        let valueX = contentLeft + labelWidth
-        let valueWidth = frame.width - valueX - rightPadding
+    private func ensureMetricRows(count: Int) -> Void {
+        let valueX = self.contentLeft + self.labelWidth
+        let valueWidth = self.frame.width - valueX - self.rightPadding
 
-        while metricRows.count < count {
-            let labelField = makeLabel(size: 12, weight: .regular)
+        while self.metricRows.count < count {
+            let labelField = self.makeLabel(size: 12, weight: .regular)
             labelField.textColor = .secondaryLabelColor
 
-            let valueField = makeLabel(size: 12, weight: .medium)
+            let valueField = self.makeLabel(size: 12, weight: .medium)
             valueField.textColor = .labelColor
             valueField.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
 
-            addSubview(labelField)
-            addSubview(valueField)
-            metricRows.append(MetricRow(labelField: labelField, valueField: valueField))
+            self.addSubview(labelField)
+            self.addSubview(valueField)
+            self.metricRows.append(MetricRow(labelField: labelField, valueField: valueField))
         }
 
-        for metricRow in metricRows {
+        for metricRow in self.metricRows {
             metricRow.valueField.frame.size.width = valueWidth
         }
     }
 
-    private func invalidateDisplay() {
-        needsDisplay = true
-        displayIfNeeded()
+    private func invalidateDisplay() -> Void {
+        self.needsDisplay = true
+        self.displayIfNeeded()
 
-        for metricRow in metricRows {
+        for metricRow in self.metricRows {
             metricRow.labelField.needsDisplay = true
             metricRow.valueField.needsDisplay = true
         }
-        timestampField.needsDisplay = true
-        nameLabel.needsDisplay = true
-        batteryView.needsDisplay = true
+        self.timestampField.needsDisplay = true
+        self.nameLabel.needsDisplay = true
+        self.batteryView.needsDisplay = true
     }
 
     // MARK: - Reading Rows

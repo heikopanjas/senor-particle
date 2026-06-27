@@ -15,7 +15,7 @@ class NotificationManager {
 
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(handleReadingDidUpdate),
+            selector: #selector(self.handleReadingDidUpdate),
             name: .aranetReadingDidUpdate,
             object: nil
         )
@@ -27,8 +27,8 @@ class NotificationManager {
 
     // MARK: - Private
 
-    @objc private func handleReadingDidUpdate() {
-        guard let devices = sensorManager?.sortedDevices else { return }
+    @objc private func handleReadingDidUpdate() -> Void {
+        guard let devices = self.sensorManager?.sortedDevices else { return }
 
         for device in devices {
             let id = device.device.id
@@ -38,15 +38,15 @@ class NotificationManager {
                 let newStatus = reading.status
             else {
                 // Clear stored status so re-enabling doesn't fire a spurious transition
-                previousStatuses.removeValue(forKey: id)
+                self.previousStatuses.removeValue(forKey: id)
                 continue
             }
 
-            if let previous = previousStatuses[id], previous != newStatus {
-                deliver(reading: reading, deviceId: id, from: previous, to: newStatus)
+            if let previous = self.previousStatuses[id], previous != newStatus {
+                self.deliver(reading: reading, deviceId: id, from: previous, to: newStatus)
             }
 
-            previousStatuses[id] = newStatus
+            self.previousStatuses[id] = newStatus
         }
     }
 
@@ -55,7 +55,7 @@ class NotificationManager {
         deviceId: UUID,
         from previous: AranetStatusColor,
         to current: AranetStatusColor
-    ) {
+    ) -> Void {
         guard
             let notification = StatusNotificationCopy.content(
                 for: reading,

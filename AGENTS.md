@@ -18,7 +18,7 @@
 
 ## Technology Stack
 
-- **Language:** Swift
+- **Language:** Swift 6 with complete strict concurrency checking
 - **Framework:** Cocoa (AppKit) - macOS menu bar app
 - **Build System:** Xcode
 - **Platform:** macOS
@@ -100,6 +100,7 @@ When initializing a session or analyzing the workspace, refer to instruction fil
 - **Display Unit System**: Users can choose Metric or Imperial units in Settings > General. Store the explicit choice in `DisplayUnitSystemPreferences`; when unset, default from `Locale.current.measurementSystem`. Post `Notification.Name.displayUnitSystemPreferenceDidChange` on changes and refresh display surfaces through `MenuTrackingRefresh`. Keep all user-facing sensor value formatting centralized in `StatusBarDisplayMetric.valueString(for:)` so the status item, menu dropdown, Devices preview, and notification metric clauses stay consistent
 - **Settings Help Text**: General settings controls include concise secondary explanatory text beneath each control. Keep this copy action-oriented and focused on user-visible behavior rather than implementation details
 - **Devices Settings Hierarchy**: Keep the Devices settings surface table-based, but use `NSOutlineView` when showing hierarchical device content. Device rows stay top-level with editable name and notification controls; metric rows are children used for menu bar display selection
+- **Settings View Controllers**: Keep each Settings tab controller in its own source file (`GeneralViewController.swift`, `DevicesViewController.swift`, `AdvancedSettingsViewController.swift`) and keep `SettingsWindowController.swift` focused on window, toolbar, and shared preference helper types
 - **Update Cycle Progress**: Each sensor in the menu shows an `UpdateCycleProgressView` below the timestamp. Cycle position = `reading.ago at receive + time since lastUpdated`, repeating every interval via modulo while the menu stays open. Fill color fades from light green opaque to light green at 37% opacity. New readings re-anchor via `MonitoredDevice.updateSequence`. After a configurable number of missed intervals without a reading (**Degraded situation**, default 3, Settings > Advanced), the bar shows full opaque dark red. UI refresh during menu tracking uses `MenuTrackingRefresh` (`.common` run loop); reading delivery relies on AranetKit monitor timers and `Notification.Name.aranetReadingDidUpdate`
 
 ### Security & Safety
@@ -107,6 +108,7 @@ When initializing a session or analyzing the workspace, refer to instruction fil
 - Never include API keys, tokens, or credentials in code
 - Always require explicit human confirmation before commits
 - Maintain conventional commit message standards
+- Never include agent co-authorship trailers in commit messages
 - Keep change history transparent through commit messages
 - [Add project-specific security guidelines]
 
@@ -1773,3 +1775,12 @@ After making ANY code changes:
 ### 2026-06-27 (general settings cleanup)
 
 - **Removed General rescan control**: Removed Rescan from Settings > General to keep the tab focused on persistent preferences; rescan remains available from device-focused surfaces
+
+### 2026-06-27 (strict concurrency + settings split)
+
+- **Swift 6 strict concurrency**: Updated the app target to Swift 6 with `SWIFT_STRICT_CONCURRENCY = complete` while retaining approachable concurrency and MainActor default isolation. This makes concurrency diagnostics enforceable during normal Xcode builds
+- **Settings controller file structure**: Split Settings tab controllers into `GeneralViewController.swift`, `DevicesViewController.swift`, and `AdvancedSettingsViewController.swift`, leaving `SettingsWindowController.swift` focused on window and toolbar coordination. This keeps one primary UI controller per file and avoids implicitly unwrapped AppKit view properties
+
+### 2026-06-27 (commit authorship)
+
+- **No agent co-authorship trailers**: Updated commit workflow guidance so commits and amended commits never include agent co-authorship trailers. This keeps project history attributed only to the human author

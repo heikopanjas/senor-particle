@@ -16,33 +16,33 @@ final class StatusItemDisplayView: NSView {
 
     private var displayValue = StatusItemDisplayValue(label: "", values: [])
 
-    override var isFlipped: Bool { true }
+    override var isFlipped: Bool { return true }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
-        nil
+        return nil
     }
 
-    func configure(value: StatusItemDisplayValue) {
-        displayValue = value
-        needsDisplay = true
+    func configure(value: StatusItemDisplayValue) -> Void {
+        self.displayValue = value
+        self.needsDisplay = true
     }
 
-    override func draw(_ dirtyRect: NSRect) {
+    override func draw(_ dirtyRect: NSRect) -> Void {
         super.draw(dirtyRect)
 
         let valueX = Self.horizontalPadding + Self.labelWidth + Self.labelValueGap
-        drawVerticalLabel(displayValue.label, x: Self.horizontalPadding)
-        drawValues(displayValue.values, x: valueX)
+        self.drawVerticalLabel(self.displayValue.label, x: Self.horizontalPadding)
+        self.drawValues(self.displayValue.values, x: valueX)
     }
 
     @MainActor static func requiredWidth(for value: StatusItemDisplayValue) -> CGFloat {
         guard value.values.isEmpty == false else { return 0 }
 
-        let maxValueWidth = value.values.map { valueWidth(for: $0, count: value.values.count) }.max() ?? 0
-        return ceil(horizontalPadding * 2 + labelWidth + labelValueGap + maxValueWidth)
+        let maxValueWidth = value.values.map { Self.valueWidth(for: $0, count: value.values.count) }.max() ?? 0
+        return ceil(Self.horizontalPadding * 2 + Self.labelWidth + Self.labelValueGap + maxValueWidth)
     }
 
-    private func drawVerticalLabel(_ label: String, x: CGFloat) {
+    private func drawVerticalLabel(_ label: String, x: CGFloat) -> Void {
         let characters = label.map(String.init)
         let attributes: [NSAttributedString.Key: Any] = [
             .font: Self.labelFont,
@@ -50,7 +50,7 @@ final class StatusItemDisplayView: NSView {
         ]
         let lineHeight = Self.labelFont.ascender - Self.labelFont.descender
         let totalHeight = CGFloat(characters.count) * lineHeight
-        var y = max((bounds.height - totalHeight) / 2, 0)
+        var y = max((self.bounds.height - totalHeight) / 2, 0)
 
         for character in characters {
             let attributedCharacter = NSAttributedString(string: character, attributes: attributes)
@@ -60,7 +60,7 @@ final class StatusItemDisplayView: NSView {
         }
     }
 
-    private func drawValues(_ values: [String], x: CGFloat) {
+    private func drawValues(_ values: [String], x: CGFloat) -> Void {
         guard values.isEmpty == false else { return }
 
         let attributes: [NSAttributedString.Key: Any] = [
@@ -73,7 +73,7 @@ final class StatusItemDisplayView: NSView {
         let totalHeight =
             CGFloat(attributedValues.count) * rowHeight
             + CGFloat(max(attributedValues.count - 1, 0)) * Self.rowSpacing
-        var y = max((bounds.height - totalHeight) / 2, 0) - 0.5
+        var y = max((self.bounds.height - totalHeight) / 2, 0) - 0.5
 
         for attributedValue in attributedValues {
             attributedValue.draw(at: NSPoint(x: x, y: y))
@@ -82,11 +82,11 @@ final class StatusItemDisplayView: NSView {
     }
 
     private static func valueFont(for count: Int) -> NSFont {
-        count == 1 ? singleValueFont : stackedValueFont
+        return count == 1 ? Self.singleValueFont : Self.stackedValueFont
     }
 
     private static func valueWidth(for value: String, count: Int) -> CGFloat {
-        let attributes: [NSAttributedString.Key: Any] = [.font: valueFont(for: count)]
+        let attributes: [NSAttributedString.Key: Any] = [.font: Self.valueFont(for: count)]
         return ceil(NSAttributedString(string: value, attributes: attributes).size().width)
     }
 }
