@@ -148,10 +148,12 @@ enum StatusBarDisplayMetric: String, CaseIterable {
     case pressure
     case radiationRate
     case radiationTotal
+    case radiationDuration
     case radonConcentration
 
     private static let milliremsPerMicrosievert = 0.1
     private static let picocuriesPerLiterPerBecquerelPerCubicMeter = 1.0 / 37.0
+    private static let secondsPerDay = 86_400.0
 
     var label: String {
         switch self {
@@ -161,6 +163,7 @@ enum StatusBarDisplayMetric: String, CaseIterable {
             case .pressure: return "Pressure"
             case .radiationRate: return "Dose rate"
             case .radiationTotal: return "Total dose"
+            case .radiationDuration: return "Duration"
             case .radonConcentration: return "Radon"
         }
     }
@@ -213,6 +216,10 @@ enum StatusBarDisplayMetric: String, CaseIterable {
                         let millirems = uSv.value * Self.milliremsPerMicrosievert
                         return String(format: "%.2f mrem", millirems)
                 }
+            case .radiationDuration:
+                guard let radiationDuration = reading.radiationDuration else { return nil }
+                let days = Double(radiationDuration) / Self.secondsPerDay
+                return String(format: "%.1f d", days)
             case .radonConcentration:
                 guard let radonConcentration = reading.radonConcentration else { return nil }
                 switch DisplayUnitSystemPreferences.current {

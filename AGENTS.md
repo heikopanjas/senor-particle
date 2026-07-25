@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2026-06-27
+**Last updated:** 2026-07-25
 
 <!-- {mission} -->
 
@@ -1698,6 +1698,10 @@ After making ANY code changes:
 ---
 
 ## Recent Updates & Decisions
+
+### 2026-07-25
+
+- **Radiation measurement duration metric**: Added a `radiationDuration` case to `StatusBarDisplayMetric`, sourced from the Aranet Radiation `AranetReading.radiationDuration` value (measurement period in seconds). It renders in the menu as `Duration` in days (`%.1f d`) and is ordered immediately after `Total dose`. The value is unit-system independent (days for both metric and imperial). This surfaces how long the cumulative total dose was integrated over so users can interpret the total dose in context
 
 ### 2025-12-23
 
