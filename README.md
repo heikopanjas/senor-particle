@@ -89,7 +89,9 @@ xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -configurati
 
 ### GitHub Actions
 
-`.github/workflows/build.yml` creates signed ARM64 Developer ID builds on pushes and pull requests for `develop` and `feature/**`. `.github/workflows/release.yml` runs on pull requests targeting `main` and adds Apple notarization, stapling, Gatekeeper verification, and versioned release artifact naming. Both workflows upload a zip containing `Senor Particle.app`, `CHANGELOG.md`, and `BILL_OF_MATERIALS.md`.
+`.github/workflows/build.yml` creates signed ARM64 Developer ID builds on pushes and pull requests for `develop` and `feature/**`. `.github/workflows/release.yml` validates pull requests targeting `main`, then runs again after a merge is pushed to `main` to notarize the app and publish a versioned GitHub release. Both workflows upload a zip containing `Senor Particle.app`, `CHANGELOG.md`, and `BILL_OF_MATERIALS.md`.
+
+Each release uses `MARKETING_VERSION` as its Git tag, such as `v1.0`. Increment the version before merging another release after that tag exists.
 
 The build workflow requires these signing secrets:
 

@@ -4,6 +4,9 @@ on:
   pull_request:
     branches:
       - main
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -29,6 +32,9 @@ jobs:
     name: Build And Notarize Release App
     runs-on: macos-26
     timeout-minutes: 90
+    outputs:
+      app_version: ${{ steps.metadata.outputs.app_version }}
+      release_name: ${{ steps.metadata.outputs.release_name }}
 
     steps:
       - name: Checkout
@@ -43,6 +49,7 @@ jobs:
           xcode-select -p
 
       - name: Read Build Metadata
+        id: metadata
         run: |
           set -euo pipefail
           BUILD_SETTINGS="$(xcodebuild \
@@ -65,7 +72,20 @@ jobs:
             echo "RELEASE_NAME=$RELEASE_NAME"
             echo "ARTIFACT_ZIP=${BUILD_DIR}/${RELEASE_NAME}.zip"
           } >> "$GITHUB_ENV"
+          {
+            echo "app_version=$APP_VERSION"
+            echo "release_name=$RELEASE_NAME"
+          } >> "$GITHUB_OUTPUT"
           echo "Building Senor Particle $APP_VERSION (${GITHUB_RUN_NUMBER})"
+
+      - name: Validate Release Version
+        run: |
+          set -euo pipefail
+          RELEASE_TAG="v${APP_VERSION}"
+          if git rev-parse --verify --quiet "refs/tags/${RELEASE_TAG}" >/dev/null; then
+            echo "Release tag $RELEASE_TAG already exists; increment MARKETING_VERSION" >&2
+            exit 1
+          fi
 
       - name: Import Developer ID Certificate
         env:
@@ -280,3 +300,38 @@ jobs:
           if [[ -n "${KEYCHAIN_PATH:-}" && -f "$KEYCHAIN_PATH" ]]; then
             security delete-keychain "$KEYCHAIN_PATH"
           fi
+
+  publish:
+    name: Publish GitHub Release
+    if: github.event_name == 'push'
+    needs:
+      - release
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Notarized App Artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.release.outputs.release_name }}
+          path: dist
+
+      - name: Create GitHub Release
+        env:
+          APP_VERSION: ${{ needs.release.outputs.app_version }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_NAME: ${{ needs.release.outputs.release_name }}
+        run: |
+          set -euo pipefail
+          RELEASE_TAG="v${APP_VERSION}"
+          ARTIFACT_PATH="dist/${RELEASE_NAME}.zip"
+          if [[ ! -f "$ARTIFACT_PATH" ]]; then
+            echo "Release artifact not found at $ARTIFACT_PATH" >&2
+            exit 1
+          fi
+          gh release create "$RELEASE_TAG" "$ARTIFACT_PATH" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Senor Particle ${RELEASE_TAG}" \
+            --generate-notes
