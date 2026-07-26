@@ -2,17 +2,24 @@ import AranetKit
 import Cocoa
 
 class SensorDeviceView: NSView {
+    private struct MetricRow {
+        let labelField: NSTextField
+        let valueField: NSTextField
+    }
+
     private let iconBackgroundView = NSView()
     private let iconView = NSImageView()
     private let nameLabel = NSTextField()
     private let batteryView = BatteryView()
-    private var rowLabels: [NSTextField] = []
-    private var rowValues: [NSTextField] = []
+    private let timestampField = NSTextField()
+    private let updateCycleProgress = UpdateCycleProgressView()
+    private var metricRows: [MetricRow] = []
 
-    override var isFlipped: Bool { true }
+    override var isFlipped: Bool { return true }
 
     private let badgeSize: CGFloat = 24
-    private let iconSize: CGFloat = 14
+    private let iconViewSize: CGFloat = 16
+    private let iconSymbolPointSize: CGFloat = 12
     private let leftPadding: CGFloat = 12
     private let contentLeft: CGFloat = 42
     private let rightPadding: CGFloat = 14
@@ -23,133 +30,139 @@ class SensorDeviceView: NSView {
     private let rowHeight: CGFloat = 16
     private let rowSpacing: CGFloat = 1
     private let labelWidth: CGFloat = 90
+    private let progressHeight: CGFloat = 2
+    private let progressTopGap: CGFloat = 6
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        setupFixedSubviews()
+        self.setupFixedSubviews()
     }
 
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
+    @available(*, unavailable) required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     // MARK: - Configuration
 
-    func configure(device: AranetDevice, reading: AranetReading?, lastUpdated: Date? = nil) {
-        nameLabel.stringValue = reading?.name ?? device.name
+    func configure(device: AranetDevice, reading: AranetReading?, lastUpdated: Date? = nil, updateSequence: UInt = 0) -> Void {
+        self.nameLabel.stringValue =
+            DeviceNamePreferences.name(for: device.id)
+            ?? reading?.name
+            ?? device.name
 
         let batteryWidth: CGFloat = 56
-        batteryView.frame = NSRect(
-            x: frame.width - rightPadding - batteryWidth,
-            y: topPadding,
-            width: batteryWidth,
-            height: nameRowHeight
-        )
+        self.batteryView.frame = NSRect(
+            x: self.frame.width - self.rightPadding - batteryWidth, y: self.topPadding, width: batteryWidth, height: self.nameRowHeight)
 
-        nameLabel.frame = NSRect(
-            x: contentLeft,
-            y: topPadding,
-            width: frame.width - contentLeft - rightPadding - batteryWidth - 4,
-            height: nameRowHeight
-        )
+        self.nameLabel.frame = NSRect(
+            x: self.contentLeft, y: self.topPadding, width: self.frame.width - self.contentLeft - self.rightPadding - batteryWidth - 4,
+            height: self.nameRowHeight)
 
-        let status = effectiveStatus(from: reading)
+        let status = SensorSymbol.effectiveStatus(from: reading)
 
         if let reading {
-            iconView.image = iconForDeviceType(reading.deviceType)
-            iconView.contentTintColor = .white
-            iconBackgroundView.layer?.backgroundColor = backgroundForStatus(status).cgColor
-            batteryView.configure(battery: Int(reading.battery))
+            self.iconView.image = SensorSymbol.image(for: reading.deviceType, status: status, pointSize: self.iconSymbolPointSize)
+            self.iconView.contentTintColor = .white
+            self.iconBackgroundView.layer?.backgroundColor = self.backgroundForStatus(status).cgColor
+            self.batteryView.configure(battery: Int(reading.battery))
         }
         else {
-            iconView.image = NSImage(
-                systemSymbolName: "dot.radiowaves.left.and.right",
-                accessibilityDescription: "sensor"
-            )
-            iconView.contentTintColor = .white
-            iconBackgroundView.layer?.backgroundColor = NSColor.tertiaryLabelColor.cgColor
-            batteryView.clear()
+            self.iconView.image = SensorSymbol.scanningImage(pointSize: self.iconSymbolPointSize, weight: .semibold)
+            self.iconView.contentTintColor = .white
+            self.iconBackgroundView.layer?.backgroundColor = NSColor.tertiaryLabelColor.cgColor
+            self.batteryView.clear()
         }
 
-        for label in rowLabels { label.removeFromSuperview() }
-        for value in rowValues { value.removeFromSuperview() }
-        rowLabels.removeAll()
-        rowValues.removeAll()
+        let rows = self.readingRows(from: reading)
+        self.ensureMetricRows(count: rows.count)
 
-        let rows = readingRows(from: reading)
-        let valueX = contentLeft + labelWidth
-        let valueWidth = frame.width - valueX - rightPadding
+        let valueX = self.contentLeft + self.labelWidth
+        let valueWidth = self.frame.width - valueX - self.rightPadding
+        var y = self.topPadding + self.nameRowHeight + self.nameBottomGap
 
-        var y = topPadding + nameRowHeight + nameBottomGap
-
-        for row in rows {
-            let labelField = makeLabel(size: 12, weight: .regular)
-            labelField.stringValue = row.label
-            labelField.textColor = .secondaryLabelColor
-            labelField.frame = NSRect(x: contentLeft, y: y, width: labelWidth, height: rowHeight)
-            addSubview(labelField)
-            rowLabels.append(labelField)
-
-            let valueField = makeLabel(size: 12, weight: .medium)
-            valueField.stringValue = row.value
-            valueField.textColor = .labelColor
-            valueField.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
-            valueField.frame = NSRect(x: valueX, y: y, width: valueWidth, height: rowHeight)
-            addSubview(valueField)
-            rowValues.append(valueField)
-
-            y += rowHeight + rowSpacing
+        for (index, row) in rows.enumerated() {
+            let metricRow = self.metricRows[index]
+            metricRow.labelField.stringValue = row.label
+            metricRow.valueField.stringValue = row.value
+            metricRow.labelField.frame = NSRect(x: self.contentLeft, y: y, width: self.labelWidth, height: self.rowHeight)
+            metricRow.valueField.frame = NSRect(x: valueX, y: y, width: valueWidth, height: self.rowHeight)
+            metricRow.labelField.isHidden = false
+            metricRow.valueField.isHidden = false
+            y += self.rowHeight + self.rowSpacing
         }
 
-        if let lastUpdated, reading != nil {
+        for index in rows.count ..< self.metricRows.count {
+            self.metricRows[index].labelField.isHidden = true
+            self.metricRows[index].valueField.isHidden = true
+        }
+
+        if let lastUpdated, let reading {
             y += 2
-            let ageField = makeLabel(size: 10, weight: .regular)
-            ageField.textColor = .secondaryLabelColor
-            ageField.stringValue = formatTimestamp(lastUpdated)
-            ageField.frame = NSRect(x: contentLeft, y: y, width: frame.width - contentLeft - rightPadding, height: 14)
-            addSubview(ageField)
-            rowLabels.append(ageField)
+            self.timestampField.stringValue = self.formatTimestamp(self.sensorMeasurementDate(receivedAt: lastUpdated, reading: reading))
+            self.timestampField.frame = NSRect(x: self.contentLeft, y: y, width: self.frame.width - self.contentLeft - self.rightPadding, height: 14)
+            self.timestampField.isHidden = false
             y += 14
+
+            y += self.progressTopGap
+            let progressWidth = self.frame.width - self.contentLeft - self.rightPadding
+            self.updateCycleProgress.frame = NSRect(x: self.contentLeft, y: y, width: progressWidth, height: self.progressHeight)
+            self.updateCycleProgress.configure(
+                lastUpdated: lastUpdated, reading: reading, updateSequence: updateSequence)
+            y += self.progressHeight
+        }
+        else {
+            self.timestampField.isHidden = true
+            self.updateCycleProgress.clear()
         }
 
-        let totalHeight = y - rowSpacing + bottomPadding
-        setFrameSize(NSSize(width: frame.width, height: totalHeight))
+        let totalHeight = y - self.rowSpacing + self.bottomPadding
+        self.setFrameSize(NSSize(width: self.frame.width, height: totalHeight))
 
-        let badgeY = topPadding + (nameRowHeight - badgeSize) / 2
-        iconBackgroundView.frame = NSRect(x: leftPadding, y: badgeY, width: badgeSize, height: badgeSize)
-        iconBackgroundView.layer?.cornerRadius = badgeSize / 2
+        let badgeY = self.topPadding + (self.nameRowHeight - self.badgeSize) / 2
+        self.layoutIconBadge(at: badgeY, deviceType: reading?.deviceType)
 
-        let iconInset = (badgeSize - iconSize) / 2
-        iconView.frame = NSRect(
-            x: leftPadding + iconInset,
-            y: badgeY + iconInset,
-            width: iconSize,
-            height: iconSize
+        self.invalidateDisplay()
+    }
+
+    private func layoutIconBadge(at badgeY: CGFloat, deviceType: AranetDeviceType?) -> Void {
+        let badgeFrame = NSRect(x: self.leftPadding, y: badgeY, width: self.badgeSize, height: self.badgeSize)
+        self.iconBackgroundView.frame = badgeFrame
+        self.iconBackgroundView.layer?.cornerRadius = self.badgeSize / 2
+
+        let iconInset = (self.badgeSize - self.iconViewSize) / 2
+        let offset = deviceType.map { SensorSymbol.alignmentOffset(for: $0) } ?? .zero
+        self.iconView.frame = NSRect(
+            x: badgeFrame.minX + iconInset + offset.width,
+            y: badgeFrame.minY + iconInset + offset.height,
+            width: self.iconViewSize,
+            height: self.iconViewSize
         )
     }
 
     // MARK: - Setup
 
-    private func setupFixedSubviews() {
-        iconBackgroundView.wantsLayer = true
-        iconBackgroundView.layer?.masksToBounds = true
-        addSubview(iconBackgroundView)
+    private func setupFixedSubviews() -> Void {
+        self.iconBackgroundView.wantsLayer = true
+        self.iconBackgroundView.layer?.masksToBounds = true
+        self.addSubview(self.iconBackgroundView)
 
-        iconView.imageScaling = .scaleProportionallyUpOrDown
-        addSubview(iconView)
+        self.iconView.imageScaling = .scaleProportionallyDown
+        self.iconView.imageAlignment = .alignCenter
+        self.addSubview(self.iconView)
 
-        configureLabel(nameLabel, size: 13, weight: .semibold)
-        addSubview(nameLabel)
+        self.configureLabel(self.nameLabel, size: 13, weight: .semibold)
+        self.addSubview(self.nameLabel)
 
-        addSubview(batteryView)
+        self.addSubview(self.batteryView)
+
+        self.configureLabel(self.timestampField, size: 10, weight: .regular)
+        self.timestampField.textColor = .secondaryLabelColor
+        self.timestampField.isHidden = true
+        self.addSubview(self.timestampField)
+
+        self.addSubview(self.updateCycleProgress)
     }
 
-    private func configureLabel(_ label: NSTextField, size: CGFloat, weight: NSFont.Weight) {
-        label.backgroundColor = .clear
-        label.isBezeled = false
-        label.isEditable = false
-        label.isSelectable = false
+    private func configureLabel(_ label: NSTextField, size: CGFloat, weight: NSFont.Weight) -> Void {
+        label.applyPlainLabelStyle()
         label.font = .systemFont(ofSize: size, weight: weight)
         label.lineBreakMode = .byTruncatingTail
     }
@@ -160,6 +173,41 @@ class SensorDeviceView: NSView {
         return label
     }
 
+    private func ensureMetricRows(count: Int) -> Void {
+        let valueX = self.contentLeft + self.labelWidth
+        let valueWidth = self.frame.width - valueX - self.rightPadding
+
+        while self.metricRows.count < count {
+            let labelField = self.makeLabel(size: 12, weight: .regular)
+            labelField.textColor = .secondaryLabelColor
+
+            let valueField = self.makeLabel(size: 12, weight: .medium)
+            valueField.textColor = .labelColor
+            valueField.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+
+            self.addSubview(labelField)
+            self.addSubview(valueField)
+            self.metricRows.append(MetricRow(labelField: labelField, valueField: valueField))
+        }
+
+        for metricRow in self.metricRows {
+            metricRow.valueField.frame.size.width = valueWidth
+        }
+    }
+
+    private func invalidateDisplay() -> Void {
+        self.needsDisplay = true
+        self.displayIfNeeded()
+
+        for metricRow in self.metricRows {
+            metricRow.labelField.needsDisplay = true
+            metricRow.valueField.needsDisplay = true
+        }
+        self.timestampField.needsDisplay = true
+        self.nameLabel.needsDisplay = true
+        self.batteryView.needsDisplay = true
+    }
+
     // MARK: - Reading Rows
 
     private struct ReadingRow {
@@ -168,34 +216,12 @@ class SensorDeviceView: NSView {
     }
 
     private func readingRows(from reading: AranetReading?) -> [ReadingRow] {
-        guard let reading else {
-            return [ReadingRow(label: "", value: "Connecting\u{2026}")]
-        }
+        guard let reading else { return [] }
 
-        var rows: [ReadingRow] = []
-
-        if let co2 = reading.co2 {
-            rows.append(ReadingRow(label: "CO\u{2082}", value: "\(co2) ppm"))
+        return StatusBarDisplayMetric.availableMetrics(for: reading).compactMap { metric in
+            guard let value = metric.valueString(for: reading) else { return nil }
+            return ReadingRow(label: metric.label, value: value)
         }
-        if let temp = reading.temperature {
-            rows.append(ReadingRow(label: "Temperature", value: String(format: "%.1f \u{00B0}C", temp.value)))
-        }
-        if let humidity = reading.humidity {
-            rows.append(ReadingRow(label: "Humidity", value: "\(humidity)%"))
-        }
-        if let pressure = reading.pressure {
-            rows.append(ReadingRow(label: "Pressure", value: String(format: "%.1f hPa", pressure.value)))
-        }
-        if let rate = reading.radiationRate {
-            let uSv = rate.converted(to: .microsieverts)
-            rows.append(ReadingRow(label: "Dose rate", value: String(format: "%.3f \u{00B5}Sv/h", uSv.value)))
-        }
-        if let total = reading.radiationTotal {
-            let uSv = total.converted(to: .microsieverts)
-            rows.append(ReadingRow(label: "Total dose", value: String(format: "%.2f \u{00B5}Sv", uSv.value)))
-        }
-
-        return rows
     }
 
     private static let timestampFormatter: DateFormatter = {
@@ -204,36 +230,14 @@ class SensorDeviceView: NSView {
         return formatter
     }()
 
-    private func formatTimestamp(_ date: Date) -> String {
-        return Self.timestampFormatter.string(from: date)
-    }
+    private func formatTimestamp(_ date: Date) -> String { return Self.timestampFormatter.string(from: date) }
 
-    // MARK: - Status
-
-    /// Returns a status color for the device. Aranet4, Aranet Radiation, and
-    /// Aranet Radon provide native status via AranetKit; Aranet2 defaults to green.
-    private func effectiveStatus(from reading: AranetReading?) -> AranetStatusColor? {
-        guard let reading else { return nil }
-        if let status = reading.status { return status }
-        if reading.temperature != nil || reading.humidity != nil { return .green }
-        return nil
+    /// When the sensor recorded the reading, derived from app receive time minus device-reported age.
+    private func sensorMeasurementDate(receivedAt: Date, reading: AranetReading) -> Date {
+        receivedAt.addingTimeInterval(-TimeInterval(reading.ago ?? 0))
     }
 
     // MARK: - Appearance
-
-    private func iconForDeviceType(_ type: AranetDeviceType) -> NSImage? {
-        let name: String
-        switch type {
-            case .aranet4: name = "wind"
-            case .aranet2: name = "thermometer.medium"
-            case .aranetRadiation: name = "atom"
-            case .aranetRadon: name = "humidity.fill"
-            case .unknown: name = "dot.radiowaves.left.and.right"
-        }
-        let config = NSImage.SymbolConfiguration(pointSize: iconSize, weight: .bold)
-        return NSImage(systemSymbolName: name, accessibilityDescription: type.name)?
-            .withSymbolConfiguration(config)
-    }
 
     private func backgroundForStatus(_ status: AranetStatusColor?) -> NSColor {
         switch status {

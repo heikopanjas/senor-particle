@@ -6,8 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		42BDA3A12F70910300ED2C08 /* AranetKit in Frameworks */ = {isa = PBXBuildFile; productRef = 42AA10612EFBC80A00825D79 /* AranetKit */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
-		428A10472EFAC80A00825D79 /* senor-particle.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "senor-particle.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		428A10472EFAC80A00825D79 /* Senor Particle.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Senor Particle.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -23,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				42BDA3A12F70910300ED2C08 /* AranetKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -40,7 +45,7 @@
 		428A10482EFAC80A00825D79 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				428A10472EFAC80A00825D79 /* senor-particle.app */,
+				428A10472EFAC80A00825D79 /* Senor Particle.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -68,7 +73,7 @@
 				42AA10612EFBC80A00825D79 /* AranetKit */,
 			);
 			productName = "senor-particle";
-			productReference = 428A10472EFAC80A00825D79 /* senor-particle.app */;
+			productReference = 428A10472EFAC80A00825D79 /* Senor Particle.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -133,11 +138,14 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_ENABLE_MODULES = YES;
+				CLANG_MODULE_CACHE_PATH = "$(PROJECT_DIR)/Build/ModuleCache.noindex";
+				CLANG_MODULES_BUILD_SESSION_FILE = "$(PROJECT_DIR)/Build/ModuleCache.noindex/Session.modulevalidation";
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
@@ -163,6 +171,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				COMPILATION_CACHE_CAS_PATH = "$(PROJECT_DIR)/Build/CompilationCache.noindex";
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 8J2G689FCZ;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -183,11 +192,17 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				DERIVED_DATA_DIR = "$(PROJECT_DIR)/Build";
+				INDEX_DATA_STORE_DIR = "$(PROJECT_DIR)/Build/Index.noindex/DataStore";
+				LOGS_ROOT = "$(PROJECT_DIR)/Build/Logs";
 				MACOSX_DEPLOYMENT_TARGET = 15.7;
+				MODULE_CACHE_DIR = "$(PROJECT_DIR)/Build/ModuleCache.noindex";
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
+				SDK_STAT_CACHE_DIR = "$(PROJECT_DIR)/Build";
+				SOURCE_PACKAGES_DIR = "$(PROJECT_DIR)/Build/SourcePackages";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -197,11 +212,14 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_ENABLE_MODULES = YES;
+				CLANG_MODULE_CACHE_PATH = "$(PROJECT_DIR)/Build/ModuleCache.noindex";
+				CLANG_MODULES_BUILD_SESSION_FILE = "$(PROJECT_DIR)/Build/ModuleCache.noindex/Session.modulevalidation";
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
@@ -226,6 +244,7 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COMPILATION_CACHE_CAS_PATH = "$(PROJECT_DIR)/Build/CompilationCache.noindex";
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 8J2G689FCZ;
@@ -241,10 +260,16 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				DERIVED_DATA_DIR = "$(PROJECT_DIR)/Build";
+				INDEX_DATA_STORE_DIR = "$(PROJECT_DIR)/Build/Index.noindex/DataStore";
+				LOGS_ROOT = "$(PROJECT_DIR)/Build/Logs";
 				MACOSX_DEPLOYMENT_TARGET = 15.7;
+				MODULE_CACHE_DIR = "$(PROJECT_DIR)/Build/ModuleCache.noindex";
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
+				SDK_STAT_CACHE_DIR = "$(PROJECT_DIR)/Build";
+				SOURCE_PACKAGES_DIR = "$(PROJECT_DIR)/Build/SourcePackages";
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
@@ -255,33 +280,53 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "senor-particle/senor-particle.entitlements";
-				CODE_SIGN_STYLE = Automatic;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
+				CLANG_MODULES_BUILD_SESSION_FILE = "$(PROJECT_DIR)/Build/ModuleCache.noindex/Session.modulevalidation";
+				CONFIGURATION_BUILD_DIR = "$(PROJECT_DIR)/Build/Products/Debug";
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 8J2G689FCZ;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=macosx*]" = 8J2G689FCZ;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Senor Particle needs Bluetooth to communicate with Aranet sensors.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				INDEX_DATA_STORE_DIR = "$(PROJECT_DIR)/Build/Index.noindex/DataStore";
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(BUILD_DIR)/$(CONFIGURATION)",
+				);
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(BUILD_DIR)/$(CONFIGURATION)",
+				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.panjas.senor-particle";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_MODULE_NAME = senor_particle;
+				PRODUCT_NAME = "Senor Particle";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_INCLUDE_PATHS = (
+					"$(inherited)",
+					"$(BUILD_DIR)/$(CONFIGURATION)",
+				);
+				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 			};
 			name = Debug;
 		};
@@ -291,33 +336,40 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "senor-particle/senor-particle.entitlements";
-				CODE_SIGN_STYLE = Automatic;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
+				CLANG_MODULES_BUILD_SESSION_FILE = "$(PROJECT_DIR)/Build/ModuleCache.noindex/Session.modulevalidation";
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 8J2G689FCZ;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=macosx*]" = 8J2G689FCZ;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Senor Particle needs Bluetooth to communicate with Aranet sensors.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				INDEX_DATA_STORE_DIR = "$(PROJECT_DIR)/Build/Index.noindex/DataStore";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.panjas.senor-particle";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_MODULE_NAME = senor_particle;
+				PRODUCT_NAME = "Senor Particle";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 			};
 			name = Release;
 		};
@@ -347,10 +399,10 @@
 /* Begin XCRemoteSwiftPackageReference section */
 		42AA10602EFBC80A00825D79 /* XCRemoteSwiftPackageReference "aranet-kit" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/heikopanjas/aranet-kit.git";
+			repositoryURL = "https://github.com/heikopanjas/aranet-kit";
 			requirement = {
-				branch = develop;
-				kind = branch;
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.5.2;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
