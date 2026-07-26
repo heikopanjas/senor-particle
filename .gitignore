@@ -31,6 +31,8 @@ playground.xcworkspace
 # hence it is not needed unless you have added a package configuration file to your project
 # .swiftpm
 
+# Build/ is the only supported generated root. Keep the other entries as
+# defensive ignores for accidental SwiftPM or legacy Xcode output.
 .build/
 Build/
 SourcePackages/

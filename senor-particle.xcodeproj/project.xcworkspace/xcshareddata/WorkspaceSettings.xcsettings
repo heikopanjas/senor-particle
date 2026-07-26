@@ -7,7 +7,7 @@
     <key>CustomBuildLocationType</key>
     <string>RelativeToDerivedData</string>
     <key>DerivedDataCustomLocation</key>
-    <string>Build</string>
+    <string>Build/DerivedData</string>
     <key>DerivedDataLocationStyle</key>
     <string>WorkspaceRelativePath</string>
   </dict>

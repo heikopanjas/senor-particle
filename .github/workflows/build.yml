@@ -18,6 +18,7 @@ env:
   SCHEME: senor-particle
   APP_NAME: Senor Particle
   BUILD_DIR: Build/CI
+  DERIVED_DATA_PATH: Build/DerivedData/CI
   ARCHIVE_PATH: Build/CI/Senor Particle.xcarchive
   EXPORT_PATH: Build/CI/export
   EXPORT_PLIST: exportOptions.plist
@@ -25,6 +26,7 @@ env:
   CHANGELOG_PATH: Build/CI/CHANGELOG.md
   BOM_PATH: Build/CI/BILL_OF_MATERIALS.md
   PACKAGE_DIR: Build/CI/package
+  PACKAGE_CACHE_DIR: Build/SourcePackages
   PACKAGE_RESOLVED: senor-particle.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
   DESTINATION: generic/platform=macOS
 
@@ -54,6 +56,8 @@ jobs:
             -scheme "$SCHEME" \
             -configuration Release \
             -destination "$DESTINATION" \
+            -derivedDataPath "$DERIVED_DATA_PATH" \
+            -clonedSourcePackagesDirPath "$PACKAGE_CACHE_DIR" \
             -showBuildSettings)"
           APP_VERSION="$(printf '%s\n' "$BUILD_SETTINGS" | awk '/MARKETING_VERSION/ { print $3; exit }')"
           if [[ ! "$APP_VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
@@ -108,8 +112,17 @@ jobs:
       - name: Clean Release Artifacts
         run: |
           set -euo pipefail
-          rm -rf "$BUILD_DIR"
+          rm -rf "$BUILD_DIR" "$DERIVED_DATA_PATH"
           mkdir -p "$BUILD_DIR"
+
+      - name: Resolve Package Dependencies
+        run: |
+          set -euo pipefail
+          xcodebuild -resolvePackageDependencies \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -derivedDataPath "$DERIVED_DATA_PATH" \
+            -clonedSourcePackagesDirPath "$PACKAGE_CACHE_DIR"
 
       - name: Archive Release App
         env:
@@ -121,6 +134,8 @@ jobs:
             -scheme "$SCHEME" \
             -configuration Release \
             -destination "$DESTINATION" \
+            -derivedDataPath "$DERIVED_DATA_PATH" \
+            -clonedSourcePackagesDirPath "$PACKAGE_CACHE_DIR" \
             -archivePath "$ARCHIVE_PATH" \
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" \

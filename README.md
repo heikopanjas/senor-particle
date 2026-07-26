@@ -43,10 +43,10 @@ open senor-particle.xcodeproj
 Build and run with `Cmd + R`, or from the command line:
 
 ```bash
-xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -configuration Debug build
+xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -configuration Debug -destination "generic/platform=macOS" -derivedDataPath Build/DerivedData/CLI -clonedSourcePackagesDirPath Build/SourcePackages build
 ```
 
-Dependencies are resolved automatically via Swift Package Manager.
+Dependencies are resolved automatically via Swift Package Manager. All generated files stay under `Build/`: app products in `Build/Products`, intermediates and Derived Data in `Build/DerivedData`, package checkouts and tools in `Build/SourcePackages`, local distribution output in `Build/Local`, and GitHub Actions staging in `Build/CI`.
 
 ## Usage
 
@@ -88,15 +88,17 @@ senor-particle/
 
 ```bash
 # Debug build
-xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -configuration Debug build
+xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -configuration Debug -destination "generic/platform=macOS" -derivedDataPath Build/DerivedData/CLI -clonedSourcePackagesDirPath Build/SourcePackages build
 
 # Release build
-xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -configuration Release build
+xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -configuration Release -destination "generic/platform=macOS" -derivedDataPath Build/DerivedData/CLI -clonedSourcePackagesDirPath Build/SourcePackages build
 ```
+
+Use `build.sh` for a Developer ID archive and export. It writes archives, exported apps, and optional notarization zips below `Build/Local` while reusing `Build/SourcePackages`.
 
 ### GitHub Actions
 
-`.github/workflows/build.yml` creates signed ARM64 Developer ID builds on pushes and pull requests for `develop` and `feature/**`. `.github/workflows/release.yml` validates pull requests targeting `main`, then runs again after a merge is pushed to `main` to notarize the app and publish a versioned GitHub release. Both workflows upload a zip containing `Senor Particle.app`, `CHANGELOG.md`, and `BILL_OF_MATERIALS.md`.
+`.github/workflows/build.yml` creates signed ARM64 Developer ID builds on pushes and pull requests for `develop` and `feature/**`. `.github/workflows/release.yml` validates pull requests targeting `main`, then runs again after a merge is pushed to `main` to notarize the app and publish a versioned GitHub release. Both workflows use `Build/DerivedData/CI`, `Build/SourcePackages`, and `Build/CI`, then upload a zip containing `Senor Particle.app`, `CHANGELOG.md`, and `BILL_OF_MATERIALS.md`.
 
 Release runs also create an app-only Sparkle archive, generate an EdDSA-signed appcast, and retain all update archives in the mutable `sparkle-updates` prerelease. After those archives are available, the workflow deploys the appcast to [GitHub Pages](https://heikopanjas.github.io/senor-particle/appcast.xml). Delta updates are intentionally disabled until multiple Sparkle-enabled production releases are available.
 
@@ -119,7 +121,7 @@ The release workflow requires those three signing secrets plus three App Store C
 
 The Sparkle key uses the Keychain account `com.panjas.senor-particle`. Its public key is stored in `Info.plist`; never replace it without a migration plan because existing installations trust that key.
 
-1. Resolve packages so Sparkle's tools are available under `Build/`.
+1. Resolve packages into `Build/SourcePackages` so Sparkle's tools are available at the deterministic package artifact path used by release CI.
 2. Export the existing private key with Sparkle's `generate_keys --account com.panjas.senor-particle -x <secure-file>` option.
 3. Store the exported value as the repository secret `SPARKLE_ED_PRIVATE_KEY` and keep a separate encrypted offline backup.
 4. In GitHub repository settings, configure Pages to use **GitHub Actions** as its source.

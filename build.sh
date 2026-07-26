@@ -4,9 +4,12 @@ set -euo pipefail
 PROJECT="senor-particle.xcodeproj"
 SCHEME="senor-particle"
 APP_NAME="Senor Particle"
-BUILD_DIR="./build"
-ARCHIVE_PATH="${BUILD_DIR}/${APP_NAME}.xcarchive"
-EXPORT_PATH="${BUILD_DIR}/export"
+BUILD_ROOT="Build"
+LOCAL_OUTPUT_DIR="${BUILD_ROOT}/Local"
+DERIVED_DATA_PATH="${BUILD_ROOT}/DerivedData/CLI"
+PACKAGE_CACHE_DIR="${BUILD_ROOT}/SourcePackages"
+ARCHIVE_PATH="${LOCAL_OUTPUT_DIR}/Archives/${APP_NAME}.xcarchive"
+EXPORT_PATH="${LOCAL_OUTPUT_DIR}/Export"
 EXPORT_PLIST="exportOptions.plist"
 NOTARIZE_PROFILE="SenorParticle-Notarize"
 DESTINATION="generic/platform=macOS"
@@ -43,9 +46,13 @@ for arg in "$@"; do
     esac
 done
 
-VERSION=$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -showBuildSettings 2>/dev/null \
+VERSION=$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -destination "$DESTINATION" \
+    -derivedDataPath "$DERIVED_DATA_PATH" -clonedSourcePackagesDirPath "$PACKAGE_CACHE_DIR" \
+    -showBuildSettings 2>/dev/null \
     | awk '/MARKETING_VERSION/ { print $3; exit }')
-BUILD_NUMBER=$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -showBuildSettings 2>/dev/null \
+BUILD_NUMBER=$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -destination "$DESTINATION" \
+    -derivedDataPath "$DERIVED_DATA_PATH" -clonedSourcePackagesDirPath "$PACKAGE_CACHE_DIR" \
+    -showBuildSettings 2>/dev/null \
     | awk '/CURRENT_PROJECT_VERSION/ { print $3; exit }')
 
 echo "==> Senor Particle ${VERSION} (${BUILD_NUMBER})"
@@ -54,13 +61,28 @@ echo ""
 # Clean
 if [ "$CLEAN" = true ]; then
     echo "==> Cleaning..."
-    xcodebuild -project "$PROJECT" -scheme "$SCHEME" -destination "$DESTINATION" clean -quiet
-    rm -rf "$BUILD_DIR"
+    xcodebuild -project "$PROJECT" -scheme "$SCHEME" -destination "$DESTINATION" \
+        -derivedDataPath "$DERIVED_DATA_PATH" \
+        -clonedSourcePackagesDirPath "$PACKAGE_CACHE_DIR" \
+        clean -quiet
+    rm -rf "$LOCAL_OUTPUT_DIR" "$DERIVED_DATA_PATH"
     echo "    Done."
     echo ""
 fi
 
-mkdir -p "$BUILD_DIR"
+mkdir -p "$(dirname "$ARCHIVE_PATH")"
+
+# Resolve packages into the same deterministic location used by release CI and Sparkle tooling.
+echo "==> Resolving package dependencies..."
+xcodebuild -resolvePackageDependencies \
+    -project "$PROJECT" \
+    -scheme "$SCHEME" \
+    -derivedDataPath "$DERIVED_DATA_PATH" \
+    -clonedSourcePackagesDirPath "$PACKAGE_CACHE_DIR" \
+    -quiet
+test -x "$PACKAGE_CACHE_DIR/artifacts/sparkle/Sparkle/bin/generate_appcast"
+echo "    Done."
+echo ""
 
 # Archive
 echo "==> Archiving (Release)..."
@@ -69,6 +91,8 @@ xcodebuild archive \
     -scheme "$SCHEME" \
     -configuration Release \
     -destination "$DESTINATION" \
+    -derivedDataPath "$DERIVED_DATA_PATH" \
+    -clonedSourcePackagesDirPath "$PACKAGE_CACHE_DIR" \
     -archivePath "$ARCHIVE_PATH" \
     -quiet
 echo "    Archive: ${ARCHIVE_PATH}"
@@ -87,9 +111,10 @@ echo ""
 
 # Notarize
 if [ "$NOTARIZE" = true ]; then
-    ZIP_PATH="${BUILD_DIR}/${APP_NAME}.zip"
+    ZIP_PATH="${LOCAL_OUTPUT_DIR}/Notarization/${APP_NAME}.zip"
 
     echo "==> Creating zip for notarization..."
+    mkdir -p "$(dirname "$ZIP_PATH")"
     rm -f "$ZIP_PATH"
     ditto -c -k --keepParent "${EXPORT_PATH}/${APP_NAME}.app" "$ZIP_PATH"
     echo "    Zip: ${ZIP_PATH}"
