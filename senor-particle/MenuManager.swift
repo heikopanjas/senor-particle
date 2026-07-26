@@ -1,18 +1,21 @@
 import AppKit
 import AranetKit
+import Sparkle
 
 class MenuManager: NSObject, NSMenuDelegate {
     let menu: NSMenu
     private weak var sensorManager: SensorManager?
+    private let updaterController: SPUStandardUpdaterController
     private var isOpen = false
     private var settingsWindowController: SettingsWindowController?
     private var rescanItem: NSMenuItem?
     private var deviceEntries: [UUID: (NSMenuItem, SensorDeviceView)] = [:]
     private var deviceOrder: [UUID] = []
 
-    init(menu: NSMenu, sensorManager: SensorManager) {
+    init(menu: NSMenu, sensorManager: SensorManager, updaterController: SPUStandardUpdaterController) {
         self.menu = menu
         self.sensorManager = sensorManager
+        self.updaterController = updaterController
         super.init()
 
         self.menu.delegate = self
@@ -164,7 +167,7 @@ class MenuManager: NSObject, NSMenuDelegate {
 
     @objc private func openSettings() -> Void {
         if self.settingsWindowController == nil, let sensorManager = self.sensorManager {
-            self.settingsWindowController = SettingsWindowController(sensorManager: sensorManager)
+            self.settingsWindowController = SettingsWindowController(sensorManager: sensorManager, updaterController: self.updaterController)
         }
         self.settingsWindowController?.showAndBringToFront()
     }

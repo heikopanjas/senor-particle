@@ -24,6 +24,12 @@ env:
   CHANGELOG_PATH: Build/CI/CHANGELOG.md
   BOM_PATH: Build/CI/BILL_OF_MATERIALS.md
   PACKAGE_DIR: Build/CI/package
+  UPDATE_DIR: Build/CI/sparkle
+  APPCAST_INPUT_DIR: Build/CI/sparkle/input
+  APPCAST_PATH: Build/CI/sparkle/appcast.xml
+  UPDATE_PUBLICATION_DIR: Build/CI/sparkle/publication
+  UPDATE_RELEASE_TAG: sparkle-updates
+  PACKAGE_CACHE_DIR: Build/SourcePackages
   PACKAGE_RESOLVED: senor-particle.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
   DESTINATION: generic/platform=macOS
 
@@ -35,6 +41,8 @@ jobs:
     outputs:
       app_version: ${{ steps.metadata.outputs.app_version }}
       release_name: ${{ steps.metadata.outputs.release_name }}
+      update_archive_name: ${{ steps.metadata.outputs.update_archive_name }}
+      update_notes_name: ${{ steps.metadata.outputs.update_notes_name }}
 
     steps:
       - name: Checkout
@@ -57,6 +65,7 @@ jobs:
             -scheme "$SCHEME" \
             -configuration Release \
             -destination "$DESTINATION" \
+            -clonedSourcePackagesDirPath "$PACKAGE_CACHE_DIR" \
             -showBuildSettings)"
           APP_VERSION="$(printf '%s\n' "$BUILD_SETTINGS" | awk '/MARKETING_VERSION/ { print $3; exit }')"
           if [[ ! "$APP_VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
@@ -65,16 +74,22 @@ jobs:
           fi
           DEVELOPMENT_TEAM="$(/usr/libexec/PlistBuddy -c 'Print :teamID' "$EXPORT_PLIST")"
           RELEASE_NAME="senor-particle-v${APP_VERSION}"
+          UPDATE_ARCHIVE_NAME="senor-particle-update-v${APP_VERSION}.zip"
+          UPDATE_NOTES_NAME="senor-particle-update-v${APP_VERSION}.md"
           {
             echo "APP_VERSION=$APP_VERSION"
             echo "BUILD_NUMBER=${GITHUB_RUN_NUMBER}"
             echo "DEVELOPMENT_TEAM=$DEVELOPMENT_TEAM"
             echo "RELEASE_NAME=$RELEASE_NAME"
             echo "ARTIFACT_ZIP=${BUILD_DIR}/${RELEASE_NAME}.zip"
+            echo "UPDATE_ARCHIVE_NAME=$UPDATE_ARCHIVE_NAME"
+            echo "UPDATE_NOTES_NAME=$UPDATE_NOTES_NAME"
           } >> "$GITHUB_ENV"
           {
             echo "app_version=$APP_VERSION"
             echo "release_name=$RELEASE_NAME"
+            echo "update_archive_name=$UPDATE_ARCHIVE_NAME"
+            echo "update_notes_name=$UPDATE_NOTES_NAME"
           } >> "$GITHUB_OUTPUT"
           echo "Building Senor Particle $APP_VERSION (${GITHUB_RUN_NUMBER})"
 
@@ -83,8 +98,12 @@ jobs:
           set -euo pipefail
           RELEASE_TAG="v${APP_VERSION}"
           if git rev-parse --verify --quiet "refs/tags/${RELEASE_TAG}" >/dev/null; then
-            echo "Release tag $RELEASE_TAG already exists; increment MARKETING_VERSION" >&2
-            exit 1
+            TAG_COMMIT="$(git rev-list -n 1 "$RELEASE_TAG")"
+            if [[ "$TAG_COMMIT" != "$GITHUB_SHA" ]]; then
+              echo "Release tag $RELEASE_TAG belongs to $TAG_COMMIT; increment MARKETING_VERSION" >&2
+              exit 1
+            fi
+            echo "Release tag $RELEASE_TAG already identifies this commit; continuing retry"
           fi
 
       - name: Import Developer ID Certificate
@@ -126,6 +145,15 @@ jobs:
           rm -rf "$BUILD_DIR"
           mkdir -p "$BUILD_DIR"
 
+      - name: Resolve Package Dependencies
+        run: |
+          set -euo pipefail
+          xcodebuild -resolvePackageDependencies \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -clonedSourcePackagesDirPath "$PACKAGE_CACHE_DIR"
+          test -x "$PACKAGE_CACHE_DIR/artifacts/sparkle/Sparkle/bin/generate_appcast"
+
       - name: Archive Release App
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
@@ -136,6 +164,7 @@ jobs:
             -scheme "$SCHEME" \
             -configuration Release \
             -destination "$DESTINATION" \
+            -clonedSourcePackagesDirPath "$PACKAGE_CACHE_DIR" \
             -archivePath "$ARCHIVE_PATH" \
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" \
@@ -285,11 +314,155 @@ jobs:
           )
           ls -lh "$ARTIFACT_ZIP"
 
+      - name: Package Sparkle Update
+        run: |
+          set -euo pipefail
+          rm -rf "$UPDATE_DIR"
+          mkdir -p "$APPCAST_INPUT_DIR"
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$APP_PATH" \
+            "${APPCAST_INPUT_DIR}/${UPDATE_ARCHIVE_NAME}"
+          cp "$CHANGELOG_PATH" "${APPCAST_INPUT_DIR}/${UPDATE_NOTES_NAME}"
+          ls -lh "${APPCAST_INPUT_DIR}/${UPDATE_ARCHIVE_NAME}" "${APPCAST_INPUT_DIR}/${UPDATE_NOTES_NAME}"
+
+      - name: Download Existing Sparkle Updates
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cp "${APPCAST_INPUT_DIR}/${UPDATE_ARCHIVE_NAME}" "$RUNNER_TEMP/${UPDATE_ARCHIVE_NAME}"
+          cp "${APPCAST_INPUT_DIR}/${UPDATE_NOTES_NAME}" "$RUNNER_TEMP/${UPDATE_NOTES_NAME}"
+          if gh release view "$UPDATE_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            EXISTING_DIR="$RUNNER_TEMP/existing-sparkle-updates"
+            mkdir -p "$EXISTING_DIR"
+            gh release download "$UPDATE_RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --pattern 'senor-particle-update-v*.zip' \
+              --pattern 'senor-particle-update-v*.md' \
+              --dir "$EXISTING_DIR"
+            cp "$EXISTING_DIR"/* "$APPCAST_INPUT_DIR"/
+          fi
+          cp "$RUNNER_TEMP/${UPDATE_ARCHIVE_NAME}" "$APPCAST_INPUT_DIR/${UPDATE_ARCHIVE_NAME}"
+          cp "$RUNNER_TEMP/${UPDATE_NOTES_NAME}" "$APPCAST_INPUT_DIR/${UPDATE_NOTES_NAME}"
+
+      - name: Validate Sparkle Build Number
+        run: |
+          set -euo pipefail
+          EXISTING_APPCAST="$RUNNER_TEMP/appcast.xml"
+          HTTP_STATUS="$(curl --silent --show-error --location \
+            "https://heikopanjas.github.io/senor-particle/appcast.xml" \
+            --output "$EXISTING_APPCAST" \
+            --write-out '%{http_code}')"
+          if [[ "$HTTP_STATUS" == "200" ]]; then
+            LATEST_BUILD="$(python3 - "$EXISTING_APPCAST" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          namespace = {"sparkle": "http://www.andymatuschak.org/xml-namespaces/sparkle"}
+          root = ET.parse(sys.argv[1]).getroot()
+          versions = [
+              int(element.text)
+              for element in root.findall(".//sparkle:version", namespace)
+              if element.text and element.text.isdigit()
+          ]
+          print(max(versions, default=0))
+          PY
+          )"
+            if (( BUILD_NUMBER <= LATEST_BUILD )); then
+              echo "Build $BUILD_NUMBER must be newer than appcast build $LATEST_BUILD" >&2
+              exit 1
+            fi
+          elif [[ "$HTTP_STATUS" == "404" ]]; then
+            echo "No published appcast found; treating this as the bootstrap release"
+          else
+            echo "Appcast request returned HTTP $HTTP_STATUS" >&2
+            exit 1
+          fi
+
+      - name: Generate Signed Sparkle Appcast
+        env:
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          : "${SPARKLE_ED_PRIVATE_KEY:?Missing SPARKLE_ED_PRIVATE_KEY secret}"
+          GENERATE_APPCAST="$PACKAGE_CACHE_DIR/artifacts/sparkle/Sparkle/bin/generate_appcast"
+          if [[ ! -x "$GENERATE_APPCAST" ]]; then
+            echo "Sparkle generate_appcast tool is missing at $GENERATE_APPCAST" >&2
+            find "$PACKAGE_CACHE_DIR" -maxdepth 5 -type f -name generate_appcast -print >&2 || true
+            exit 1
+          fi
+          printf '%s' "$SPARKLE_ED_PRIVATE_KEY" | "$GENERATE_APPCAST" \
+            --ed-key-file - \
+            --download-url-prefix "https://github.com/${GITHUB_REPOSITORY}/releases/download/${UPDATE_RELEASE_TAG}/" \
+            --embed-release-notes \
+            --maximum-deltas 0 \
+            --maximum-versions 0 \
+            -o "$APPCAST_PATH" \
+            "$APPCAST_INPUT_DIR"
+
+      - name: Validate Sparkle Appcast
+        run: |
+          set -euo pipefail
+          python3 - "$APPCAST_PATH" "$APP_VERSION" "$BUILD_NUMBER" "$UPDATE_ARCHIVE_NAME" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          path, expected_version, expected_build, expected_archive = sys.argv[1:]
+          namespace = {"sparkle": "http://www.andymatuschak.org/xml-namespaces/sparkle"}
+          appcast_text = open(path, encoding="utf-8").read()
+          root = ET.parse(path).getroot()
+          matching_items = []
+          for item in root.findall(".//item"):
+              version = item.findtext("sparkle:version", namespaces=namespace)
+              short_version = item.findtext("sparkle:shortVersionString", namespaces=namespace)
+              enclosure = item.find("enclosure")
+              if version == expected_build and short_version == expected_version and enclosure is not None:
+                  matching_items.append(enclosure)
+          if len(matching_items) != 1:
+              raise SystemExit("Expected exactly one current update in appcast")
+          enclosure = matching_items[0]
+          url = enclosure.get("url", "")
+          if not url.startswith("https://") or not url.endswith("/" + expected_archive):
+              raise SystemExit(f"Unexpected enclosure URL: {url}")
+          signature = enclosure.get("{http://www.andymatuschak.org/xml-namespaces/sparkle}edSignature", "")
+          if not signature:
+              raise SystemExit("Current update is missing its EdDSA signature")
+          item = next(
+              item
+              for item in root.findall(".//item")
+              if item.findtext("sparkle:version", namespaces=namespace) == expected_build
+          )
+          minimum_system_version = item.findtext("sparkle:minimumSystemVersion", namespaces=namespace)
+          hardware_requirements = item.findtext("sparkle:hardwareRequirements", namespaces=namespace)
+          if minimum_system_version != "15.7" or hardware_requirements != "arm64":
+              raise SystemExit("Appcast contains unexpected platform requirements")
+          if "<!-- sparkle-signatures:" not in appcast_text or "edSignature:" not in appcast_text:
+              raise SystemExit("Appcast is missing its signed-feed signature")
+          PY
+          xmllint --noout "$APPCAST_PATH"
+          ls -lh "$APPCAST_PATH"
+
+      - name: Stage Sparkle Publication
+        run: |
+          set -euo pipefail
+          rm -rf "$UPDATE_PUBLICATION_DIR"
+          mkdir -p "$UPDATE_PUBLICATION_DIR"
+          cp "$APPCAST_PATH" "$UPDATE_PUBLICATION_DIR/appcast.xml"
+          cp "${APPCAST_INPUT_DIR}/${UPDATE_ARCHIVE_NAME}" "$UPDATE_PUBLICATION_DIR/${UPDATE_ARCHIVE_NAME}"
+          cp "${APPCAST_INPUT_DIR}/${UPDATE_NOTES_NAME}" "$UPDATE_PUBLICATION_DIR/${UPDATE_NOTES_NAME}"
+
       - name: Upload App Artifact
         uses: actions/upload-artifact@v6
         with:
           name: ${{ env.RELEASE_NAME }}
           path: ${{ env.ARTIFACT_ZIP }}
+          if-no-files-found: error
+
+      - name: Upload Sparkle Publication Artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: sparkle-${{ env.RELEASE_NAME }}
+          path: ${{ env.UPDATE_PUBLICATION_DIR }}
           if-no-files-found: error
 
       - name: Clean Up Signing Material
@@ -317,7 +490,13 @@ jobs:
           name: ${{ needs.release.outputs.release_name }}
           path: dist
 
-      - name: Create GitHub Release
+      - name: Download Sparkle Publication Artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: sparkle-${{ needs.release.outputs.release_name }}
+          path: sparkle
+
+      - name: Publish GitHub Release
         env:
           APP_VERSION: ${{ needs.release.outputs.app_version }}
           GH_TOKEN: ${{ github.token }}
@@ -330,8 +509,87 @@ jobs:
             echo "Release artifact not found at $ARTIFACT_PATH" >&2
             exit 1
           fi
-          gh release create "$RELEASE_TAG" "$ARTIFACT_PATH" \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --title "Senor Particle ${RELEASE_TAG}" \
-            --generate-notes
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            RELEASE_TARGET="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json targetCommitish --jq .targetCommitish)"
+            if [[ "$RELEASE_TARGET" != "$GITHUB_SHA" ]]; then
+              echo "Release $RELEASE_TAG targets $RELEASE_TARGET instead of $GITHUB_SHA" >&2
+              exit 1
+            fi
+            gh release upload "$RELEASE_TAG" "$ARTIFACT_PATH" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$RELEASE_TAG" "$ARTIFACT_PATH" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "Senor Particle ${RELEASE_TAG}" \
+              --generate-notes
+          fi
+
+      - name: Publish Sparkle Update Assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPDATE_ARCHIVE_NAME: ${{ needs.release.outputs.update_archive_name }}
+          UPDATE_NOTES_NAME: ${{ needs.release.outputs.update_notes_name }}
+        run: |
+          set -euo pipefail
+          UPDATE_ARCHIVE_PATH="sparkle/${UPDATE_ARCHIVE_NAME}"
+          UPDATE_NOTES_PATH="sparkle/${UPDATE_NOTES_NAME}"
+          if [[ ! -f "$UPDATE_ARCHIVE_PATH" || ! -f "$UPDATE_NOTES_PATH" ]]; then
+            echo "Sparkle publication assets are missing" >&2
+            exit 1
+          fi
+          if gh release view "$UPDATE_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$UPDATE_RELEASE_TAG" \
+              "$UPDATE_ARCHIVE_PATH" \
+              "$UPDATE_NOTES_PATH" \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber
+          else
+            gh release create "$UPDATE_RELEASE_TAG" \
+              "$UPDATE_ARCHIVE_PATH" \
+              "$UPDATE_NOTES_PATH" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "Sparkle Update Assets" \
+              --notes "Machine-readable update archives for the Sparkle appcast." \
+              --prerelease
+          fi
+
+  pages:
+    name: Publish Sparkle Appcast
+    if: github.event_name == 'push'
+    needs:
+      - release
+      - publish
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Sparkle Publication Artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: sparkle-${{ needs.release.outputs.release_name }}
+          path: sparkle
+
+      - name: Prepare Pages Artifact
+        run: |
+          set -euo pipefail
+          mkdir -p pages
+          cp sparkle/appcast.xml pages/appcast.xml
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload GitHub Pages Artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: pages
+
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

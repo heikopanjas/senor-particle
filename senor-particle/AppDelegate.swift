@@ -1,11 +1,13 @@
 import AranetKit
 import Cocoa
+import Sparkle
 
 @main class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var sensorManager: SensorManager?
     private var menuManager: MenuManager?
     private var notificationManager: NotificationManager?
+    private let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
     private let statusItemDisplayView = StatusItemDisplayView()
     private let statusItemPlaceholderView = StatusItemPlaceholderView()
 
@@ -20,7 +22,7 @@ import Cocoa
         let sensorManager = SensorManager()
         self.sensorManager = sensorManager
 
-        self.menuManager = MenuManager(menu: menu, sensorManager: sensorManager)
+        self.menuManager = MenuManager(menu: menu, sensorManager: sensorManager, updaterController: self.updaterController)
         self.notificationManager = NotificationManager(sensorManager: sensorManager)
 
         NotificationCenter.default.addObserver(

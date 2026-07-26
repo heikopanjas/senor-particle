@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		42BDA3A12F70910300ED2C08 /* AranetKit in Frameworks */ = {isa = PBXBuildFile; productRef = 42AA10612EFBC80A00825D79 /* AranetKit */; };
+		42C0A0012F90000100A00001 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 42C0A0032F90000100A00001 /* Sparkle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +29,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				42BDA3A12F70910300ED2C08 /* AranetKit in Frameworks */,
+				42C0A0012F90000100A00001 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,6 +73,7 @@
 			name = "senor-particle";
 			packageProductDependencies = (
 				42AA10612EFBC80A00825D79 /* AranetKit */,
+				42C0A0032F90000100A00001 /* Sparkle */,
 			);
 			productName = "senor-particle";
 			productReference = 428A10472EFAC80A00825D79 /* Senor Particle.app */;
@@ -102,6 +105,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				42AA10602EFBC80A00825D79 /* XCRemoteSwiftPackageReference "aranet-kit" */,
+				42C0A0022F90000100A00001 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 428A10482EFAC80A00825D79 /* Products */;
@@ -291,13 +295,8 @@
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Senor Particle needs Bluetooth to communicate with Aranet sensors.";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				INFOPLIST_KEY_NSMainStoryboardFile = Main;
-				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Info.plist;
 				INDEX_DATA_STORE_DIR = "$(PROJECT_DIR)/Build/Index.noindex/DataStore";
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -311,7 +310,7 @@
 					"$(inherited)",
 					"$(BUILD_DIR)/$(CONFIGURATION)",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.panjas.senor-particle";
 				PRODUCT_MODULE_NAME = senor_particle;
 				PRODUCT_NAME = "Senor Particle";
@@ -346,19 +345,14 @@
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Senor Particle needs Bluetooth to communicate with Aranet sensors.";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				INFOPLIST_KEY_NSMainStoryboardFile = Main;
-				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Info.plist;
 				INDEX_DATA_STORE_DIR = "$(PROJECT_DIR)/Build/Index.noindex/DataStore";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.panjas.senor-particle";
 				PRODUCT_MODULE_NAME = senor_particle;
 				PRODUCT_NAME = "Senor Particle";
@@ -405,6 +399,14 @@
 				minimumVersion = 3.5.2;
 			};
 		};
+		42C0A0022F90000100A00001 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.9.4;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -412,6 +414,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 42AA10602EFBC80A00825D79 /* XCRemoteSwiftPackageReference "aranet-kit" */;
 			productName = AranetKit;
+		};
+		42C0A0032F90000100A00001 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 42C0A0022F90000100A00001 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
