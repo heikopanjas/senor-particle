@@ -9,10 +9,5 @@
     <string>8J2G689FCZ</string>
     <key>signingStyle</key>
     <string>manual</string>
-    <key>provisioningProfiles</key>
-    <dict>
-      <key>com.panjas.senor-particle</key>
-      <string>Senor Particle macOS</string>
-    </dict>
   </dict>
 </plist>

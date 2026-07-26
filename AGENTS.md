@@ -1530,6 +1530,12 @@ Use `build.sh` for archive, export, and optional notarization:
 ./build.sh --help
 ```
 
+### Continuous Integration
+
+`.github/workflows/build.yml` runs signed ARM64 Developer ID builds on pushes and pull requests for `develop` and `feature/**`. `.github/workflows/release.yml` runs on pull requests targeting `main`. Both import the signing certificate into temporary runner storage, archive and export the app, verify its signature and architecture, generate `CHANGELOG.md` and `BILL_OF_MATERIALS.md`, and upload the packaged zip. The release workflow alone uses versioned release artifact names and performs Apple notarization, stapling, and Gatekeeper verification. Both workflows use `macos-26`, `actions/checkout@v6`, and `actions/upload-artifact@v6`.
+
+The build workflow requires repository secrets `APPLE_CERTIFICATE_P12_BASE64`, `APPLE_CERTIFICATE_PASSWORD`, and `APPLE_SIGNING_IDENTITY`. The release workflow additionally requires `APPSTORE_CONNECT_KEY_ID`, `APPSTORE_CONNECT_ISSUER_ID`, and `APPSTORE_CONNECT_KEY_P8_BASE64` for App Store Connect API key notarization, for six secrets in total. The non-sensitive team ID is read from `exportOptions.plist`.
+
 ### Package Management
 
 ```bash
@@ -1702,6 +1708,9 @@ After making ANY code changes:
 
 - **Stable AranetKit package release**: Changed the remote Swift package requirement from the temporary `develop` branch pin to `upToNextMajorVersion` starting at `3.5.2`. Release `v3.5.2` includes the notification API required by the app, so the project can use stable semantic-version updates while `Package.resolved` continues to pin reproducible builds
 - **Apple-silicon-only builds**: Set the project-level `ARCHS` build setting to `arm64` for Debug and Release configurations. The app no longer builds or distributes an `x86_64` slice because supported deployments target Apple silicon exclusively; the shared setting also applies to command-line archives and Swift package dependencies
+- **GitHub Actions build and release pipelines**: Added Token Torch-inspired `.github/workflows/build.yml` and `.github/workflows/release.yml`. Build runs for pushes and pull requests on `develop` and `feature/**`; release runs for pull requests targeting `main`. Both produce signed ARM64 Developer ID artifacts with changelog and dependency BOM metadata, while release alone applies versioned naming and performs Apple notarization, stapling, and Gatekeeper verification
+- **App Store Connect API key notarization**: Configured the release workflow to authenticate `notarytool` with the same issuer ID, key ID, and base64-encoded `.p8` secret pattern as AranetKit. API key authentication avoids storing an Apple ID app-specific password and supports submission-log retrieval when notarization fails
+- **Profile-free Developer ID signing**: Removed the `Senor Particle macOS` provisioning profile from CI and `exportOptions.plist` after verifying a signed archive retains App Sandbox, Bluetooth, and user-selected-file entitlements without an embedded profile. The six-secret contract now matches AranetKit: certificate, certificate password, signing identity, and three App Store Connect API key values; the non-sensitive team ID remains in `exportOptions.plist`
 
 ### 2026-07-25
 

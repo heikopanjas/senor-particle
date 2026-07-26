@@ -16,7 +16,7 @@ A macOS menu bar application for real-time monitoring of Aranet Bluetooth sensor
 All Bluetooth communication is handled by [AranetKit](https://github.com/heikopanjas/aranet-kit).
 
 | Device | Measurements | Status |
-|---|---|---|
+| --- | --- | --- |
 | [Aranet4](https://aranet.com/en/home/products/aranet4-home) | CO2 (ppm), temperature, humidity, pressure | Fully supported |
 | [Aranet Radiation](https://aranet.com/en/home/products/aranet-radiation-sensor) | Dose rate (uSv/h), cumulative dose | Fully supported |
 | [Aranet2](https://aranet.com/en/home/products/aranet2-home) | Temperature, humidity | Experimental |
@@ -57,7 +57,7 @@ Dependencies are resolved automatically via Swift Package Manager.
 
 ## Architecture
 
-```
+```text
 senor-particle/
 ├── AppDelegate.swift        # Entry point, status bar setup, scan/monitor orchestration
 ├── SensorManager.swift      # Device discovery, monitoring with retry logic
@@ -86,6 +86,22 @@ xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -configurati
 # Release build
 xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -configuration Release build
 ```
+
+### GitHub Actions
+
+`.github/workflows/build.yml` creates signed ARM64 Developer ID builds on pushes and pull requests for `develop` and `feature/**`. `.github/workflows/release.yml` runs on pull requests targeting `main` and adds Apple notarization, stapling, Gatekeeper verification, and versioned release artifact naming. Both workflows upload a zip containing `Senor Particle.app`, `CHANGELOG.md`, and `BILL_OF_MATERIALS.md`.
+
+The build workflow requires these signing secrets:
+
+- `APPLE_CERTIFICATE_P12_BASE64`
+- `APPLE_CERTIFICATE_PASSWORD`
+- `APPLE_SIGNING_IDENTITY`
+
+The release workflow requires those three signing secrets plus these three App Store Connect API key secrets, for six repository secrets in total:
+
+- `APPSTORE_CONNECT_KEY_ID`
+- `APPSTORE_CONNECT_ISSUER_ID`
+- `APPSTORE_CONNECT_KEY_P8_BASE64`
 
 ## Troubleshooting
 
