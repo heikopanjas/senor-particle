@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2026-07-25
+**Last updated:** 2026-07-26
 
 <!-- {mission} -->
 
@@ -21,9 +21,8 @@
 - **Language:** Swift 6 with complete strict concurrency checking
 - **Framework:** Cocoa (AppKit) - macOS menu bar app
 - **Build System:** Xcode
-- **Platform:** macOS
-- **Dependencies:**
-  - [aranet-kit](https://github.com/heikopanjas/aranet-kit.git) - Bluetooth sensor communication library
+- **Platform:** macOS on Apple silicon (`arm64` only)
+- **Dependency:** [aranet-kit](https://github.com/heikopanjas/aranet-kit) `3.5.2` or later compatible release - Bluetooth sensor communication library
 - **Version Control:** Git
 - **Package Manager:** Swift Package Manager
 - **License:** MIT
@@ -1699,9 +1698,15 @@ After making ANY code changes:
 
 ## Recent Updates & Decisions
 
+### 2026-07-26
+
+- **Stable AranetKit package release**: Changed the remote Swift package requirement from the temporary `develop` branch pin to `upToNextMajorVersion` starting at `3.5.2`. Release `v3.5.2` includes the notification API required by the app, so the project can use stable semantic-version updates while `Package.resolved` continues to pin reproducible builds
+- **Apple-silicon-only builds**: Set the project-level `ARCHS` build setting to `arm64` for Debug and Release configurations. The app no longer builds or distributes an `x86_64` slice because supported deployments target Apple silicon exclusively; the shared setting also applies to command-line archives and Swift package dependencies
+
 ### 2026-07-25
 
 - **Radiation measurement duration metric**: Added a `radiationDuration` case to `StatusBarDisplayMetric`, sourced from the Aranet Radiation `AranetReading.radiationDuration` value (measurement period in seconds). It renders in the menu as `Duration` in days (`%.1f d`) and is ordered immediately after `Total dose`. The value is unit-system independent (days for both metric and imperial). This surfaces how long the cumulative total dose was integrated over so users can interpret the total dose in context
+- **Remote AranetKit package dependency**: Replaced the sibling `../aranet-kit` package reference with the GitHub repository at <https://github.com/heikopanjas/aranet-kit> on the `develop` branch. The app requires `Notification.Name.aranetReadingDidUpdate`, which is available on `develop` but not in the latest stable `v3.2.0` tag, so the branch requirement preserves current notification-driven updates while making package resolution independent of a local checkout. Track the shared `Package.resolved` file to pin the exact branch revision for reproducible application builds
 
 ### 2025-12-23
 
