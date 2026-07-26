@@ -22,43 +22,53 @@ final class AboutViewController: NSViewController {
     override func loadView() -> Void {
         let width: CGFloat = 420
         let height: CGFloat = 300
-        let horizontalInset: CGFloat = 20
-        let controlWidth = width - 2 * horizontalInset
+        let contentWidth: CGFloat = 380
+        let contentHeight: CGFloat = 232
 
         self.view = NSView(frame: NSRect(x: 0, y: 0, width: width, height: height))
 
-        let iconView = NSImageView(frame: NSRect(x: (width - 72) / 2, y: 202, width: 72, height: 72))
+        let contentView = NSView(
+            frame: NSRect(
+                x: (width - contentWidth) / 2,
+                y: (height - contentHeight) / 2,
+                width: contentWidth,
+                height: contentHeight
+            ))
+        contentView.autoresizingMask = [.minXMargin, .maxXMargin, .minYMargin, .maxYMargin]
+        self.view.addSubview(contentView)
+
+        let iconView = NSImageView(frame: NSRect(x: (contentWidth - 72) / 2, y: 160, width: 72, height: 72))
         iconView.image = NSApp.applicationIconImage
         iconView.imageScaling = .scaleProportionallyUpOrDown
-        self.view.addSubview(iconView)
+        contentView.addSubview(iconView)
 
         let nameLabel = NSTextField(labelWithString: self.applicationName)
         nameLabel.font = .boldSystemFont(ofSize: 18)
         nameLabel.alignment = .center
-        nameLabel.frame = NSRect(x: horizontalInset, y: 174, width: controlWidth, height: 22)
-        self.view.addSubview(nameLabel)
+        nameLabel.frame = NSRect(x: 0, y: 132, width: contentWidth, height: 22)
+        contentView.addSubview(nameLabel)
 
         let versionLabel = NSTextField(labelWithString: "Version \(self.marketingVersion) (\(self.buildNumber))")
         versionLabel.textColor = .secondaryLabelColor
         versionLabel.alignment = .center
-        versionLabel.frame = NSRect(x: horizontalInset, y: 151, width: controlWidth, height: 18)
-        self.view.addSubview(versionLabel)
+        versionLabel.frame = NSRect(x: 0, y: 109, width: contentWidth, height: 18)
+        contentView.addSubview(versionLabel)
 
         self.checkForUpdatesButton.target = self.updaterController
         self.checkForUpdatesButton.action = #selector(SPUStandardUpdaterController.checkForUpdates(_:))
-        self.checkForUpdatesButton.frame = NSRect(x: (width - 160) / 2, y: 112, width: 160, height: 32)
+        self.checkForUpdatesButton.frame = NSRect(x: (contentWidth - 160) / 2, y: 70, width: 160, height: 32)
         self.checkForUpdatesButton.bind(.enabled, to: self.updaterController.updater, withKeyPath: "canCheckForUpdates")
-        self.view.addSubview(self.checkForUpdatesButton)
+        contentView.addSubview(self.checkForUpdatesButton)
 
         self.automaticChecksToggle.target = self
         self.automaticChecksToggle.action = #selector(self.automaticChecksChanged(_:))
-        self.automaticChecksToggle.frame = NSRect(x: horizontalInset, y: 72, width: controlWidth, height: 22)
-        self.view.addSubview(self.automaticChecksToggle)
+        self.automaticChecksToggle.frame = NSRect(x: 0, y: 30, width: contentWidth, height: 22)
+        contentView.addSubview(self.automaticChecksToggle)
 
         self.automaticDownloadsToggle.target = self
         self.automaticDownloadsToggle.action = #selector(self.automaticDownloadsChanged(_:))
-        self.automaticDownloadsToggle.frame = NSRect(x: horizontalInset, y: 42, width: controlWidth, height: 22)
-        self.view.addSubview(self.automaticDownloadsToggle)
+        self.automaticDownloadsToggle.frame = NSRect(x: 0, y: 0, width: contentWidth, height: 22)
+        contentView.addSubview(self.automaticDownloadsToggle)
     }
 
     override func viewWillAppear() -> Void {
