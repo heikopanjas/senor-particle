@@ -29,6 +29,7 @@ env:
   APPCAST_PATH: Build/CI/sparkle/appcast.xml
   UPDATE_PUBLICATION_DIR: Build/CI/sparkle/publication
   UPDATE_RELEASE_TAG: sparkle-updates
+  PACKAGE_CACHE_DIR: Build/SourcePackages
   PACKAGE_RESOLVED: senor-particle.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
   DESTINATION: generic/platform=macOS
 
@@ -64,6 +65,7 @@ jobs:
             -scheme "$SCHEME" \
             -configuration Release \
             -destination "$DESTINATION" \
+            -clonedSourcePackagesDirPath "$PACKAGE_CACHE_DIR" \
             -showBuildSettings)"
           APP_VERSION="$(printf '%s\n' "$BUILD_SETTINGS" | awk '/MARKETING_VERSION/ { print $3; exit }')"
           if [[ ! "$APP_VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
@@ -143,6 +145,15 @@ jobs:
           rm -rf "$BUILD_DIR"
           mkdir -p "$BUILD_DIR"
 
+      - name: Resolve Package Dependencies
+        run: |
+          set -euo pipefail
+          xcodebuild -resolvePackageDependencies \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -clonedSourcePackagesDirPath "$PACKAGE_CACHE_DIR"
+          test -x "$PACKAGE_CACHE_DIR/artifacts/sparkle/Sparkle/bin/generate_appcast"
+
       - name: Archive Release App
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
@@ -153,6 +164,7 @@ jobs:
             -scheme "$SCHEME" \
             -configuration Release \
             -destination "$DESTINATION" \
+            -clonedSourcePackagesDirPath "$PACKAGE_CACHE_DIR" \
             -archivePath "$ARCHIVE_PATH" \
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" \
@@ -373,9 +385,10 @@ jobs:
         run: |
           set -euo pipefail
           : "${SPARKLE_ED_PRIVATE_KEY:?Missing SPARKLE_ED_PRIVATE_KEY secret}"
-          GENERATE_APPCAST="$(find Build -path '*/artifacts/sparkle/Sparkle/bin/generate_appcast' -type f -print -quit)"
-          if [[ -z "$GENERATE_APPCAST" ]]; then
-            echo "Sparkle generate_appcast tool was not resolved" >&2
+          GENERATE_APPCAST="$PACKAGE_CACHE_DIR/artifacts/sparkle/Sparkle/bin/generate_appcast"
+          if [[ ! -x "$GENERATE_APPCAST" ]]; then
+            echo "Sparkle generate_appcast tool is missing at $GENERATE_APPCAST" >&2
+            find "$PACKAGE_CACHE_DIR" -maxdepth 5 -type f -name generate_appcast -print >&2 || true
             exit 1
           fi
           printf '%s' "$SPARKLE_ED_PRIVATE_KEY" | "$GENERATE_APPCAST" \
