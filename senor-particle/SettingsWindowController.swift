@@ -1,6 +1,7 @@
 import AranetKit
 import Cocoa
 import ServiceManagement
+import Sparkle
 
 // MARK: - Degraded situation preferences
 
@@ -57,6 +58,7 @@ extension NSToolbarItem.Identifier {
     fileprivate static let general = NSToolbarItem.Identifier("general")
     fileprivate static let devices = NSToolbarItem.Identifier("devices")
     fileprivate static let advancedSettings = NSToolbarItem.Identifier("advancedSettings")
+    fileprivate static let about = NSToolbarItem.Identifier("about")
 }
 
 // MARK: - SettingsWindowController
@@ -66,12 +68,14 @@ class SettingsWindowController: NSWindowController {
     private let generalVC: GeneralViewController
     private let devicesVC: DevicesViewController
     private let advancedSettingsVC: AdvancedSettingsViewController
+    private let aboutVC: AboutViewController
     private var selectedIdentifier = NSToolbarItem.Identifier.general
 
-    init(sensorManager: SensorManager) {
+    init(sensorManager: SensorManager, updaterController: SPUStandardUpdaterController) {
         self.generalVC = GeneralViewController()
         self.devicesVC = DevicesViewController(sensorManager: sensorManager)
         self.advancedSettingsVC = AdvancedSettingsViewController()
+        self.aboutVC = AboutViewController(updaterController: updaterController)
 
         super.init(
             window: NSWindow(
@@ -117,6 +121,7 @@ class SettingsWindowController: NSWindowController {
     @objc private func showGeneral() -> Void { self.switchToTab(.general) }
     @objc private func showDevices() -> Void { self.switchToTab(.devices) }
     @objc private func showAdvancedSettings() -> Void { self.switchToTab(.advancedSettings) }
+    @objc private func showAbout() -> Void { self.switchToTab(.about) }
 
     private func switchToTab(_ identifier: NSToolbarItem.Identifier) -> Void {
         guard identifier != self.selectedIdentifier, let window = self.window else { return }
@@ -136,6 +141,7 @@ class SettingsWindowController: NSWindowController {
             case .general: return self.generalVC
             case .devices: return self.devicesVC
             case .advancedSettings: return self.advancedSettingsVC
+            case .about: return self.aboutVC
             default: return self.generalVC
         }
     }
@@ -145,6 +151,7 @@ class SettingsWindowController: NSWindowController {
             case .general: return "General"
             case .devices: return "Devices"
             case .advancedSettings: return "Advanced"
+            case .about: return "About"
             default: return "Settings"
         }
     }
@@ -154,18 +161,22 @@ class SettingsWindowController: NSWindowController {
 
 extension SettingsWindowController: NSToolbarDelegate {
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        return [.general, .devices, .advancedSettings]
+        return [.general, .devices, .advancedSettings, .about]
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        return [.general, .devices, .advancedSettings]
+        return [.general, .devices, .advancedSettings, .about]
     }
 
     func toolbarSelectableItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        return [.general, .devices, .advancedSettings]
+        return [.general, .devices, .advancedSettings, .about]
     }
 
-    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+    func toolbar(
+        _ toolbar: NSToolbar,
+        itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier,
+        willBeInsertedIntoToolbar flag: Bool
+    ) -> NSToolbarItem? {
         let item = NSToolbarItem(itemIdentifier: itemIdentifier)
         switch itemIdentifier {
             case .general:
@@ -182,6 +193,11 @@ extension SettingsWindowController: NSToolbarDelegate {
                 item.label = "Advanced"
                 item.image = NSImage(systemSymbolName: "slider.horizontal.3", accessibilityDescription: "Advanced")
                 item.action = #selector(self.showAdvancedSettings)
+                item.target = self
+            case .about:
+                item.label = "About"
+                item.image = NSImage(systemSymbolName: "info.circle", accessibilityDescription: "About")
+                item.action = #selector(self.showAbout)
                 item.target = self
             default:
                 return nil

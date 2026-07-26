@@ -15,6 +15,7 @@
 - Real-time sensor data display in menu bar
 - Custom status item view with sensor readings
 - Background monitoring and updates
+- Signed automatic application updates hosted on GitHub
 
 ## Technology Stack
 
@@ -22,7 +23,7 @@
 - **Framework:** Cocoa (AppKit) - macOS menu bar app
 - **Build System:** Xcode
 - **Platform:** macOS on Apple silicon (`arm64` only)
-- **Dependency:** [aranet-kit](https://github.com/heikopanjas/aranet-kit) `3.5.2` or later compatible release - Bluetooth sensor communication library
+- **Dependencies:** [AranetKit](https://github.com/heikopanjas/aranet-kit) `3.5.2` or later compatible release for Bluetooth sensor communication, and [Sparkle](https://github.com/sparkle-project/Sparkle) `2.9.4` or later compatible 2.x release for automatic updates
 - **Version Control:** Git
 - **Package Manager:** Swift Package Manager
 - **License:** MIT
@@ -100,6 +101,8 @@ When initializing a session or analyzing the workspace, refer to instruction fil
 - **Settings Help Text**: General settings controls include concise secondary explanatory text beneath each control. Keep this copy action-oriented and focused on user-visible behavior rather than implementation details
 - **Devices Settings Hierarchy**: Keep the Devices settings surface table-based, but use `NSOutlineView` when showing hierarchical device content. Device rows stay top-level with editable name and notification controls; metric rows are children used for menu bar display selection
 - **Settings View Controllers**: Keep each Settings tab controller in its own source file (`GeneralViewController.swift`, `DevicesViewController.swift`, `AdvancedSettingsViewController.swift`) and keep `SettingsWindowController.swift` focused on window, toolbar, and shared preference helper types
+- **Automatic Updates**: Use one long-lived `SPUStandardUpdaterController` owned by `AppDelegate` and pass it explicitly through `MenuManager` to `SettingsWindowController` and `AboutViewController`. Keep all update UI in Settings > About; bind the manual check button to `canCheckForUpdates` and use Sparkle's `automaticallyChecksForUpdates` and `automaticallyDownloadsUpdates` properties directly instead of duplicating preferences. Preserve Sparkle's second-launch consent prompt and notification-before-install defaults
+- **Sparkle Security**: Require EdDSA-signed archives and signed feeds with `SUVerifyUpdateBeforeExtraction` and `SURequireSignedFeed`. Keep the public key in `Info.plist`, the private key only in the `SPARKLE_ED_PRIVATE_KEY` repository secret plus an offline backup, and pass it to `generate_appcast` through standard input. Sandboxed builds use direct outgoing network access, the Installer Launcher service, and the `-spks`/`-spki` Mach lookup exceptions; do not enable Sparkle's Downloader service
 - **Update Cycle Progress**: Each sensor in the menu shows an `UpdateCycleProgressView` below the timestamp. Cycle position = `reading.ago at receive + time since lastUpdated`, repeating every interval via modulo while the menu stays open. Fill color fades from light green opaque to light green at 37% opacity. New readings re-anchor via `MonitoredDevice.updateSequence`. After a configurable number of missed intervals without a reading (**Degraded situation**, default 3, Settings > Advanced), the bar shows full opaque dark red. UI refresh during menu tracking uses `MenuTrackingRefresh` (`.common` run loop); reading delivery relies on AranetKit monitor timers and `Notification.Name.aranetReadingDidUpdate`
 
 ### Security & Safety
@@ -1532,9 +1535,9 @@ Use `build.sh` for archive, export, and optional notarization:
 
 ### Continuous Integration
 
-`.github/workflows/build.yml` runs signed ARM64 Developer ID builds on pushes and pull requests for `develop` and `feature/**`. `.github/workflows/release.yml` validates pull requests targeting `main`, then runs on pushes to `main` after merge. Both import the signing certificate into temporary runner storage, archive and export the app, verify its signature and architecture, generate `CHANGELOG.md` and `BILL_OF_MATERIALS.md`, and upload the packaged zip. The release workflow alone uses versioned release artifact names and performs Apple notarization, stapling, and Gatekeeper verification. Its post-merge run creates a GitHub release tagged from `MARKETING_VERSION`; an existing version tag fails validation so the version must be incremented before the next release. Both workflows use `macos-26`, `actions/checkout@v6`, and `actions/upload-artifact@v6`; release publication uses `actions/download-artifact@v8`.
+`.github/workflows/build.yml` runs signed ARM64 Developer ID builds on pushes and pull requests for `develop` and `feature/**`. `.github/workflows/release.yml` validates pull requests targeting `main`, then runs on pushes to `main` after merge. Both import the signing certificate into temporary runner storage, archive and export the app, verify its signature and architecture, generate `CHANGELOG.md` and `BILL_OF_MATERIALS.md`, and upload the packaged zip. The release workflow alone uses versioned release artifact names and performs Apple notarization, stapling, and Gatekeeper verification. It also creates a notarized app-only Sparkle archive, generates an EdDSA-signed appcast with deltas disabled, and validates the feed during pull requests. Post-merge, it publishes the normal `v<MARKETING_VERSION>` release, uploads versioned archives and notes to the mutable `sparkle-updates` prerelease, then deploys only `appcast.xml` to GitHub Pages. Update assets must be published before the feed. Release publication is retry-safe only when an existing version tag targets the same commit; otherwise increment `MARKETING_VERSION`. Use `GITHUB_RUN_NUMBER` as the monotonically increasing `CFBundleVersion`. Both workflows use `macos-26`, `actions/checkout@v6`, and `actions/upload-artifact@v6`; publication uses `actions/download-artifact@v8`, and Pages uses the official configure, upload, and deploy actions.
 
-The build workflow requires repository secrets `APPLE_CERTIFICATE_P12_BASE64`, `APPLE_CERTIFICATE_PASSWORD`, and `APPLE_SIGNING_IDENTITY`. The release workflow additionally requires `APPSTORE_CONNECT_KEY_ID`, `APPSTORE_CONNECT_ISSUER_ID`, and `APPSTORE_CONNECT_KEY_P8_BASE64` for App Store Connect API key notarization, for six secrets in total. The non-sensitive team ID is read from `exportOptions.plist`.
+The build workflow requires repository secrets `APPLE_CERTIFICATE_P12_BASE64`, `APPLE_CERTIFICATE_PASSWORD`, and `APPLE_SIGNING_IDENTITY`. The release workflow additionally requires `APPSTORE_CONNECT_KEY_ID`, `APPSTORE_CONNECT_ISSUER_ID`, and `APPSTORE_CONNECT_KEY_P8_BASE64` for App Store Connect API key notarization plus `SPARKLE_ED_PRIVATE_KEY` for appcast/update signing, for seven secrets in total. The Sparkle key uses Keychain account `com.panjas.senor-particle`; retain an encrypted offline backup of its exported private key. The non-sensitive team ID is read from `exportOptions.plist`. Configure repository Pages with GitHub Actions as its source. Version 1.1.0 is the Sparkle bootstrap release, so 1.0 installations require one final manual upgrade.
 
 ### Package Management
 
@@ -1706,6 +1709,7 @@ After making ANY code changes:
 
 ### 2026-07-26
 
+- **Sparkle automatic updates**: Added Sparkle 2.9.4 through Swift Package Manager with one updater controller owned by `AppDelegate` and an About settings tab for manual checks, automatic-check consent, and automatic downloads. Signed app-only updates are hosted in a dedicated `sparkle-updates` GitHub prerelease, while a signed appcast is deployed to GitHub Pages only after its archive exists. The sandbox permits direct HTTPS update access and Sparkle Installer Launcher communication; archives and the feed use a repository-specific EdDSA key. Release 1.1.0 bootstraps updates, full archives ship first, and deltas remain deferred
 - **Stable AranetKit package release**: Changed the remote Swift package requirement from the temporary `develop` branch pin to `upToNextMajorVersion` starting at `3.5.2`. Release `v3.5.2` includes the notification API required by the app, so the project can use stable semantic-version updates while `Package.resolved` continues to pin reproducible builds
 - **Apple-silicon-only builds**: Set the project-level `ARCHS` build setting to `arm64` for Debug and Release configurations. The app no longer builds or distributes an `x86_64` slice because supported deployments target Apple silicon exclusively; the shared setting also applies to command-line archives and Swift package dependencies
 - **GitHub Actions build and release pipelines**: Added Token Torch-inspired `.github/workflows/build.yml` and `.github/workflows/release.yml`. Build runs for pushes and pull requests on `develop` and `feature/**`; release runs for pull requests targeting `main`. Both produce signed ARM64 Developer ID artifacts with changelog and dependency BOM metadata, while release alone applies versioned naming and performs Apple notarization, stapling, and Gatekeeper verification
