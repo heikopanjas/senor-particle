@@ -4,6 +4,8 @@
   <dict>
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
+    <key>CFBundleDisplayName</key>
+    <string>Señor Particle</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -25,7 +27,7 @@
     <key>LSUIElement</key>
     <true />
     <key>NSBluetoothAlwaysUsageDescription</key>
-    <string>Senor Particle needs Bluetooth to communicate with Aranet sensors.</string>
+    <string>Señor Particle needs Bluetooth to communicate with Aranet sensors.</string>
     <key>NSHumanReadableCopyright</key>
     <string></string>
     <key>NSMainStoryboardFile</key>

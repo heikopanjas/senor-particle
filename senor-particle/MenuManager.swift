@@ -36,13 +36,13 @@ class MenuManager: NSObject, NSMenuDelegate {
         settingsItem.target = self
         self.menu.addItem(settingsItem)
 
-        let aboutItem = NSMenuItem(title: "About Senor Particle", action: #selector(openAbout), keyEquivalent: "")
+        let aboutItem = NSMenuItem(title: "About \(Bundle.main.displayName)", action: #selector(openAbout), keyEquivalent: "")
         aboutItem.target = self
         self.menu.addItem(aboutItem)
 
         self.menu.addItem(NSMenuItem.separator())
 
-        self.menu.addItem(NSMenuItem(title: "Quit Se\u{00F1}or Particle", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        self.menu.addItem(NSMenuItem(title: "Quit \(Bundle.main.displayName)", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
         NotificationCenter.default.addObserver(
             self,

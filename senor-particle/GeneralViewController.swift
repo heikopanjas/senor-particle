@@ -42,7 +42,7 @@ class GeneralViewController: NSViewController {
 
         y -= 4 + descriptionHeight
         self.addDescription(
-            "Open Se\u{00F1}or Particle automatically after you sign in to macOS.",
+            "Open \(Bundle.main.displayName) automatically after you sign in to macOS.",
             x: x,
             y: y,
             width: controlWidth,

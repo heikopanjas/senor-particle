@@ -42,7 +42,7 @@ final class AboutViewController: NSViewController {
         iconView.imageScaling = .scaleProportionallyUpOrDown
         contentView.addSubview(iconView)
 
-        let nameLabel = NSTextField(labelWithString: self.applicationName)
+        let nameLabel = NSTextField(labelWithString: Bundle.main.displayName)
         nameLabel.font = .boldSystemFont(ofSize: 18)
         nameLabel.alignment = .center
         nameLabel.frame = NSRect(x: 0, y: 132, width: contentWidth, height: 22)
@@ -99,12 +99,6 @@ final class AboutViewController: NSViewController {
         self.automaticChecksToggle.state = updater.automaticallyChecksForUpdates == true ? .on : .off
         self.automaticDownloadsToggle.state = updater.automaticallyDownloadsUpdates == true ? .on : .off
         self.automaticDownloadsToggle.isEnabled = updater.automaticallyChecksForUpdates == true
-    }
-
-    private var applicationName: String {
-        return Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
-            ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String
-            ?? "Se\u{00F1}or Particle"
     }
 
     private var marketingVersion: String {
