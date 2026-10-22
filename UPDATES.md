@@ -4,6 +4,13 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.0, code review re-checked against aranetkit 4.0.0 13:55)
+
+- re-checked every aranetkit-dependent finding in code_review.md against aranetkit 4.0.0 (released today): c3 drops from high to medium because concurrent scans no longer hang inside the library, k5 now rests on a documented main-actor delivery contract, a3 adopts aranetkit's own sensorclient protocol instead of an app-local one, c4 and c5 get real error messages from localizederror
+- added c20 (3.5.2 kept polling a device after the app cancelled its monitoring task; 4.0.0 stops the loop when the iteration ends) and d7 (the project pins aranetkit below 4.0.0 with uptonextmajorversion from 3.5.2; the bump is phase 0 step 0 and needs one hardware run)
+- rationale: the plan must target the dependency the app will ship with, and 4.0.0 removes two of the review's defects at the source
+- version: stays 1.2.0, documentation only
+
 ### 2026-10-22 (v1.2.0, code review fix plan 08:57)
 
 - added code_review.md with the findings of a full static review against the swift-coding-conventions, swift-concurrency-pro, and swift-testing-pro skills, plus a six-phase fix plan with milestones and verification commands

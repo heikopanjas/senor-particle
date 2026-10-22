@@ -4,6 +4,7 @@
 **Scope:** every Swift source under `senor-particle/`, the Xcode project settings, the shared scheme, `Info.plist`, entitlements, CI workflows, and the agent instruction files
 **Method:** line-by-line static review against the `swift-coding-conventions`, `swift-concurrency-pro`, and `swift-testing-pro` skills, cross-checked against the pinned AranetKit 3.5.2 sources (`75eedd0`) for isolation and API contracts
 **Not done:** no build, lint, or test run. The review environment has no Xcode or Swift toolchain. Every phase below ends with the macOS commands that verify it.
+**Re-checked:** 2026-10-22 against AranetKit 4.0.0 (`v4.0.0`, released the same day). The section "AranetKit 4.0.0 impact" lists what the new release changes; findings C3, C4, C5, K5, A3, A9, T2, T3, and D3 carry an "AranetKit 4.0.0" note, and C20 and D7 are new.
 
 Line numbers refer to the reviewed revision. Finding IDs are stable and are referenced from the phases in Part 2.
 
@@ -15,12 +16,26 @@ The app is small (23 files, about 2,900 lines), already builds under Swift 6 wit
 
 The review found four groups of problems that need work, in priority order:
 
-1. **Monitoring resilience (C1, C2, C3).** The reconnect loop in `SensorManager` abandons a device permanently after five lifetime disconnects, finished monitoring tasks block any restart via Rescan, and `rescan()` can run two AranetKit scans concurrently, which leaks a continuation inside AranetKit and hangs the first scan. These are user-visible bugs for a background monitor that is meant to run for weeks.
+1. **Monitoring resilience (C1, C2, C3).** The reconnect loop in `SensorManager` abandons a device permanently after five lifetime disconnects, finished monitoring tasks block any restart via Rescan, and `rescan()` can run two scans concurrently. Against AranetKit 3.5.2 the double scan hung the first caller inside AranetKit; 4.0.0 joins concurrent scans, so C3 drops to Medium, but the app-side guard is still needed. These are user-visible bugs for a background monitor that is meant to run for weeks.
 2. **No tests, and code shaped so it cannot be tested (T1, A2, A3, A4).** There is no test target, CI never runs tests, and `AGENTS.md` names XCTest while the project's own testing skill mandates Swift Testing. Preferences are static enums bound to `UserDefaults.standard`, `SensorManager` owns a concrete `AranetClient`, and views call `Date()` directly, so none of the interesting logic can be exercised in isolation.
 3. **Notification fan-out (C7, C8, K5).** Five objects observe AranetKit's `aranetReadingDidUpdate` and each re-derives state from `SensorManager`. Correct behavior depends on undocumented observer ordering and on AranetKit posting from the main actor. Each reading also triggers two full menu refreshes.
 4. **Convention drift (S1–S14, A1).** Around 60 unqualified `Self.` accesses, 7 implicit returns, 7 files with more than one top-level type, 6 dead `StatusBarDisplayPreferences` helpers, and a line-length mismatch between `.swift-format` (147) and the conventions skill (187).
 
-Severity counts: **High 6**, **Medium 21**, **Low 27**, Informational 6.
+Severity counts: **High 5**, **Medium 23**, **Low 27**, Informational 6 (after the AranetKit 4.0.0 re-check: C3 High to Medium, C20 and D7 added).
+
+### AranetKit 4.0.0 impact
+
+AranetKit 4.0.0 shipped on 2026-10-22 with its own code review and a test suite behind it. The app still pins `3.5.2` with an `upToNextMajorVersion` requirement, so nothing changes until the dependency is bumped (D7). Once it is:
+
+| 4.0.0 change | Effect on this review |
+| --- | --- |
+| Concurrent `scan()` calls join the in-flight scan; no continuation is lost | C3 loses its hang; the re-entrancy guard remains for app state |
+| Ending the iteration of `monitor(from:)` (cancelling the consuming task or releasing the stream) stops the Bluetooth polling | New C20: `stopMonitoring()` now really stops the radio; 3.5.2 leaked a polling loop per device |
+| `AranetClient` is `@MainActor`; readings are posted from the main actor by documented contract | K5 becomes a documented contract instead of an accident; the app compiles unchanged because its default isolation is already `MainActor` |
+| `public protocol SensorClient` and `AranetClient.makeLive` | A3 uses AranetKit's protocol instead of defining one |
+| `AranetError` conforms to `LocalizedError` | C4, C5, and the catch in `rescan()` get real messages from `error.localizedDescription` |
+| `AranetError.operationInProgress` | Not reachable from the app (it never calls `readCurrentReadings`); listed for completeness |
+| Deployment target macOS 13, `AranetUUID` is an enum, `AranetClient` no longer subclasses `NSObject` | No effect: the app targets 15.7 and uses none of these |
 
 ---
 
@@ -77,9 +92,15 @@ private func monitoringTaskDidFinish(id: UUID) -> Void {
 
 (Compare the handle identity if cancellation semantics need to be exact; see Phase 1.)
 
-### C3. `rescan()` has no re-entrancy guard and AranetKit cannot tolerate concurrent scans — High
+AranetKit 4.0.0: unchanged. The stream still finishes after the first failed read, so every stream end costs one retry, and the `.failure` payload is an `AranetError` whose `localizedDescription` is now the real message, which makes the log line in C1 useful.
 
-`SensorManager.swift:48-57`. The Rescan menu item is only disabled while the menu is open (`MenuManager.swift:106`), and the Devices tab has its own Rescan button (`DevicesViewController.swift:115-117`). Two quick triggers start two `AranetClient.scan()` calls. In AranetKit 3.5.2, `scan()` stores one `scanContinuation` (`AranetClient.swift:296`) and the second call overwrites it; the first continuation is never resumed, so the first `Task` hangs forever and keeps `self` alive. `isScanning` is left consistent only by luck of the `defer`.
+### C3. `rescan()` has no re-entrancy guard — Medium (High against AranetKit 3.5.2)
+
+`SensorManager.swift:48-57`. The Rescan menu item is only disabled while the menu is open (`MenuManager.swift:106`), and the Devices tab has its own Rescan button (`DevicesViewController.swift:115-117`). Two quick triggers start two `AranetClient.scan()` calls.
+
+Against AranetKit 3.5.2 this was a hang: `scan()` stored one `scanContinuation` (`AranetClient.swift:296`), the second call overwrote it, the first continuation was never resumed, and the first `Task` kept `self` alive forever. AranetKit 4.0.0 keeps every waiter in a `WaiterRegistry` and lets a second `scan()` join the scan in progress, so both callers receive the same device list and nothing hangs.
+
+What remains is app state: both tasks run `startMonitoring()`, `isScanning` is set and cleared twice (two `aranetScanStateDidChange` posts, the second `defer` clears the flag while the other task may still be merging devices), and a scan started just before `applicationWillTerminate` is never cancelled (C19). Keep the guard and the stored handle.
 
 ```swift
 // After
@@ -102,11 +123,11 @@ Store `scanTask` and cancel it in `stopMonitoring()` so termination does not lea
 
 ### C4. Stream failures are swallowed with no log and no UI state — Medium
 
-`SensorManager.swift:101-104` discards `.failure` entirely. The only user-visible symptom of a dead connection is the progress bar turning dark red after `degradedCycles × interval` (15 minutes by default). `AGENTS.md` asks for "clear user feedback for Bluetooth connectivity and sensor communication issues". Add a `connectionState` (or `lastError`) to `MonitoredDevice`, set it from the stream, and show it in `SensorDeviceView` and the Devices tab status column instead of "Searching…".
+`SensorManager.swift:101-104` discards `.failure` entirely. The only user-visible symptom of a dead connection is the progress bar turning dark red after `degradedCycles × interval` (15 minutes by default). `AGENTS.md` asks for "clear user feedback for Bluetooth connectivity and sensor communication issues". Add a `connectionState` (or `lastError`) to `MonitoredDevice`, set it from the stream, and show it in `SensorDeviceView` and the Devices tab status column instead of "Searching…". AranetKit 4.0.0: `AranetError` is a `LocalizedError`, so the state can show `error.localizedDescription` verbatim ("Failed to connect to device", "Operation timed out") instead of a generic Foundation message.
 
 ### C5. Initial scan failure is silent and never retried — Medium
 
-`AppDelegate.swift:53-63`. If Bluetooth is off or unauthorized at launch, `scan()` throws, the error goes to `NSLog`, the status item shows the placeholder forever, and the menu says "No devices found". Nothing retries when Bluetooth comes back. Surface the error text in the menu ("Bluetooth is off. Turn it on and choose Rescan.") and retry automatically on the next `aranetScanStateDidChange` or a timer-backed backoff.
+`AppDelegate.swift:53-63`. If Bluetooth is off or unauthorized at launch, `scan()` throws, the error goes to `NSLog`, the status item shows the placeholder forever, and the menu says "No devices found". Nothing retries when Bluetooth comes back. Surface the error text in the menu ("Bluetooth is off. Turn it on and choose Rescan.") and retry automatically on the next `aranetScanStateDidChange` or a timer-backed backoff. AranetKit 4.0.0: the thrown `AranetError` describes itself ("Bluetooth access is not authorized. Please grant Bluetooth permissions in System Settings."), so the menu can show the library text and add only the retry hint.
 
 ### C6. Renaming a device does not refresh the menu or notification title — Medium
 
@@ -166,6 +187,10 @@ Fix: `SensorManager` becomes the single observer of the AranetKit notification. 
 
 `AppDelegate.swift:53-63`. `applicationWillTerminate` stops monitoring but an in-flight scan continues. Store the task (or move the startup sequence into `SensorManager.start()` with C3's `scanTask`) and cancel it in `stopMonitoring()`.
 
+### C20. Cancelled monitoring kept AranetKit polling the device — Medium against 3.5.2, resolved by D7
+
+`SensorManager.swift:67-70, 95-107`. `stopMonitoring()` cancels the app's task and `monitorWithRetry` returns from inside `for await`, which releases the stream. In AranetKit 3.5.2 that did nothing to the producer: the library's monitoring loop kept connecting and reading the device until the process exited, so a Rescan after a give-up, or a device removed from the list, left a Bluetooth polling loop behind. AranetKit 4.0.0 cancels the producer when the iteration ends (consumer cancelled or stream released), which makes the app's existing code correct without changes. Phase 1's `SensorManagerTests` assert it through the fake stream's `onTermination`.
+
 ## K. Concurrency (swift-concurrency-pro)
 
 ### K1. Timer callbacks allocate a `Task` per tick to hop to an actor they are already on — Medium
@@ -205,7 +230,7 @@ catch { return }
 
 ### K5. `@objc` observers depend on AranetKit posting from the main actor — Medium
 
-All five handlers in C8 are selector-based, which bypasses isolation checking. They are safe only because AranetKit calls `postReadingDidUpdate` from `@MainActor` methods (`AranetClient.swift:420, 480`). A future AranetKit change would move these handlers off the main thread with no compiler diagnostic. Mitigation in two steps: add `MainActor.assertIsolated()` at the top of the single remaining handler after C8, and record the contract in `AGENTS.md`. Longer term, consume `NotificationCenter.default.notifications(named:)` from a main-actor task owned by `SensorManager` so isolation is checked.
+All five handlers in C8 are selector-based, which bypasses isolation checking. Against AranetKit 3.5.2 they were safe only because `postReadingDidUpdate` happened to be called from `@MainActor` methods (`AranetClient.swift:420, 480`), with nothing documenting it. AranetKit 4.0.0 makes it a contract: `AranetClient` is `@MainActor`, `ReadingMonitor.publish` runs on the main actor, and the library's `AGENTS.md` states "Readings are posted to `NotificationCenter` from the main actor; consumers may rely on main-thread delivery." The risk shrinks from "accident" to "documented contract that the compiler still does not check". Mitigation stays the same and gets cheaper: add `MainActor.assertIsolated()` at the top of the single remaining handler after C8, and cite the AranetKit contract in `AGENTS.md`. Consuming `NotificationCenter.default.notifications(named:)` from a main-actor task owned by `SensorManager` remains the option that makes isolation checked.
 
 ### K6. Per-device unstructured tasks — Info
 
@@ -265,19 +290,21 @@ Keys live in one `private enum PreferenceKey`. Every setter compares before writ
 
 ### A3. `SensorManager` owns a concrete `AranetClient` — High (testability)
 
-`SensorManager.swift:16`. The retry/backoff, task registry, and device merge logic (C1–C3) are exactly what needs tests, and none of it is reachable without Bluetooth. Introduce the smallest protocol that covers what the app uses and inject it:
+`SensorManager.swift:16`. The retry/backoff, task registry, and device merge logic (C1–C3) are exactly what needs tests, and none of it is reachable without Bluetooth. AranetKit 4.0.0 ships the seam, so the app does not define its own protocol:
 
 ```swift
-// SensorClient.swift
-protocol SensorClient: AnyObject {
-    @MainActor func scan(timeout: TimeInterval) async throws -> [AranetDevice]
-    @MainActor func monitor(from device: AranetDevice) -> AsyncStream<Result<AranetReading, any Error>>
+// AranetKit 4.0.0
+@MainActor
+public protocol SensorClient: AnyObject, Sendable {
+    var verbose: Bool { get set }
+    func scan(timeout: TimeInterval) async throws -> [AranetDevice]
+    func readCurrentReadings(from device: AranetDevice) async throws -> AranetReading
+    func monitor(from device: AranetDevice) -> AsyncStream<Result<AranetReading, any Error>>
 }
-
 extension AranetClient: SensorClient {}
 ```
 
-`init(client: any SensorClient = AranetClient())`. Tests supply a fake whose `monitor` returns `AsyncStream.makeStream(of:)` continuations they control.
+`SensorManager.init(client: any SensorClient = AranetClient())`; `AppDelegate` keeps calling `SensorManager()`. Tests supply a `FakeSensorClient` that records calls and returns `AsyncStream.makeStream(of:)` continuations they control; the fake has to implement all four members (`verbose` and `readCurrentReadings` as stubs). AranetKit's own fakes live in its test targets and are not exported, but `Tests/AranetCliTests/Fakes/FakeSensorClient.swift` in the aranet-kit repository is a working template. `AranetClient.makeLive` exists for callers that need a factory instead of an instance; the app does not.
 
 ### A4. Time is read directly from `Date()` — Medium (testability)
 
@@ -325,7 +352,7 @@ struct UpdateCycleCalculator {
 
 ### A9. Hand-rolled unit conversion that AranetKit already provides — Low
 
-`StatusBarDisplayMetric.swift:156, 229-231` defines `picocuriesPerLiterPerBecquerelPerCubicMeter = 1/37`. AranetKit 3.5.2 ships `UnitRadioactivity.picocuriesPerLiter` (`Units.swift:110`); use `radonConcentration.converted(to: .picocuriesPerLiter)`. AranetKit has no millirem unit, so `milliremsPerMicrosievert` stays (document it, or contribute `UnitRadiationDose.millirems` upstream and switch when the dependency is bumped).
+`StatusBarDisplayMetric.swift:156, 229-231` defines `picocuriesPerLiterPerBecquerelPerCubicMeter = 1/37`. AranetKit ships `UnitRadioactivity.picocuriesPerLiter` (`Units.swift`, unchanged in 4.0.0); use `radonConcentration.converted(to: .picocuriesPerLiter)`. AranetKit has no millirem unit, so `milliremsPerMicrosievert` stays (document it, or contribute `UnitRadiationDose.millirems` upstream and switch when the dependency is bumped).
 
 ### A10. Manual frame arithmetic across all Settings tabs — Low (optional)
 
@@ -442,7 +469,7 @@ Written against the shapes introduced by A2–A4. Suites are `struct`s, no `@Sui
 | `StatusNotificationCopyTests` | all 64 category × transition × personality entries non-empty (C14); same-color and `nil` transitions produce no content; title uses custom name then reading name; metric clause picks CO₂ → radiation → radon → generic | A2, A5 |
 | `StatusTransitionTrackerTests` | first reading sets baseline without firing; disabling clears baseline; one event per transition; re-enabling does not replay | Phase 3 extraction |
 | `UpdateCycleCalculatorTests` | progress 0 at anchor, wraps at `interval`, `ago` offsets the anchor, degraded exactly at `interval × cycles` (`>=`), interval fallback 300, `max(interval, 1)` | A4 |
-| `SensorManagerTests` | backoff 5/10/20/40/80 s (clock injected), gives up after 5 consecutive failures, counter resets after success (C1), finished task removed and restartable (C2), second `rescan` while scanning is a no-op (C3), `stopMonitoring` cancels, devices merged not duplicated, `.failure` updates connection state (C4) | A3, A4 |
+| `SensorManagerTests` | backoff 5/10/20/40/80 s (clock injected), gives up after 5 consecutive failures, counter resets after success (C1), finished task removed and restartable (C2), second `rescan` while scanning is a no-op (C3), `stopMonitoring` cancels and the fake stream's `onTermination` fires (C20), devices merged not duplicated, `.failure` updates connection state (C4) | A3 (AranetKit `SensorClient`), A4, D7 |
 | `PreferencesStoreTests` | degraded cycles clamp to 1…10 and default 3 on 0/negative; scan timeout defaults to 15 when unset; unit system falls back to injected `Locale`; invalid raw values fall back; setters do not post when unchanged | A2 |
 | `BatterySymbolTests` | boundaries 12/13, 37/38, 62/63, 87/88, 100; critical at 6 vs 7 | extract `BatteryLevel` helper from `BatteryView` |
 | `SensorSymbolTests` | `systemName` per type/status; `effectiveStatus` returns `.green` when only temperature/humidity present | none |
@@ -452,7 +479,7 @@ Tags: `.preferences`, `.formatting`, `.monitoring`, `.notifications`. Fixtures: 
 
 ### T3. Concurrency testing
 
-Per `swift-concurrency-pro/references/testing.md`: `SensorManagerTests` drive a fake `AsyncStream` continuation (`makeStream(of:)`) and cancel the monitoring task while it is suspended on the stream to prove the loop exits; no timing-based waits. Add a CI job variant with Thread Sanitizer (`-enableThreadSanitizer YES`) once the suite exists.
+Per `swift-concurrency-pro/references/testing.md`: `SensorManagerTests` drive a fake `AsyncStream` continuation (`makeStream(of:)`) and cancel the monitoring task while it is suspended on the stream to prove the loop exits; no timing-based waits. The fake conforms to AranetKit 4.0.0's `SensorClient` (A3). Two lessons from the aranet-kit suite apply here: releasing an `AsyncStream` cancels its producer, so a test that wants the stream alive must keep the iterator in scope; and work the subject starts in its own `Task` may run after the call that started it returns, so tests wait for an observable effect (a recorded call, a continuation registered) before acting on it, never on ordering assumptions. Add a CI job variant with Thread Sanitizer (`-enableThreadSanitizer YES`) once the suite exists.
 
 ### T4. UI tests — Info
 
@@ -483,6 +510,7 @@ See S9. Pick 147.
 - "Code Review: [Describe your code review process]" → point to this file.
 - "[Add project-specific security guidelines]" → at least: no logging of device identifiers at `.public` privacy, Sparkle key handling already documented above it.
 - Add the main-actor delivery contract for AranetKit notifications (K5) and the `os.Logger` subsystem/category convention (K8).
+- AranetKit Integration bullet: record the 4.0.0 contracts the app relies on (readings posted from the main actor; a monitor stream stops its Bluetooth activity when the iteration ends; `SensorClient` is the injection point) and the dependency rule (`upToNextMajorVersion` from 4.0.0).
 
 ### D4. `UPDATES.md` entries — Low
 
@@ -496,6 +524,17 @@ Once Phase 5 is clean, set `SWIFT_TREAT_WARNINGS_AS_ERRORS = YES` so convention 
 
 `UPDATES.md` records 1.2.0 as unpublished. Behavior fixes from Phases 1 and 3 join 1.2.0 if it is still unpublished when they land; otherwise they are a PATCH (`1.2.1`). Refactor-only phases do not bump. Follow the `semantic-versioning` skill at merge time.
 
+### D7. AranetKit is pinned below 4.0.0 — Medium
+
+`project.pbxproj:381-388` requires `upToNextMajorVersion` from `3.5.2`, and `Package.resolved` holds `75eedd0` (3.5.2). AranetKit 4.0.0 is a major release, so Xcode will not pick it up until the requirement is raised to `4.0.0`. The bump is low risk for this app:
+
+- `AranetClient` is `@MainActor` and no longer an `NSObject`: the target already compiles with `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`, `SensorManager` is main-actor isolated, and nothing relies on `NSObject` conformance.
+- Deployment target macOS 13: the app targets 15.7.
+- `AranetUUID` enum: unused by the app.
+- Monitor termination semantics: an improvement the app gets for free (C20).
+
+What the bump buys: C3 loses its hang, C20 is fixed, `error.localizedDescription` becomes meaningful (C4, C5), K5 rests on a documented contract, and A3 can use AranetKit's `SensorClient`. Do it first (Phase 0, step 0): change the requirement, let Xcode resolve `Package.resolved` to the `v4.0.0` tag, build, and run the app once against a real sensor (the AranetKit release itself has not been exercised on hardware since its rewrite; its own `TEST_PLAN.md` says so).
+
 ---
 
 # Part 2: Fix plan
@@ -506,17 +545,18 @@ Six phases, each with a milestone that is observable from CI or from the running
 
 **Milestone M0: CI builds, lints, and runs an empty test target on every push.**
 
-Findings: T1 (target only), D1, D2, S9.
+Findings: D7, C20, T1 (target only), D1, D2, S9.
 
+0. Raise the AranetKit requirement to `upToNextMajorVersion` from `4.0.0` in `project.pbxproj`, resolve packages so `Package.resolved` points at the `v4.0.0` tag, build, and run the app against a real sensor once (D7). This alone fixes C20 and the AranetKit half of C3.
 1. Add a `SenorParticleTests` unit-test bundle target to the project, hosted by the app, `SWIFT_VERSION = 6.0`, `SWIFT_STRICT_CONCURRENCY = complete`, `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`, `SWIFT_APPROACHABLE_CONCURRENCY = YES`. One placeholder suite with a single trivial `@Test` so the step is green.
 2. Add the test target to the shared scheme's `TestAction`.
 3. Add the lint and test steps from D1 to `build.yml` and to the pull-request path of `release.yml`.
 4. Wrap the five lines in S9. Decide D2 (147) and record it in `AGENTS.md`.
 5. `AGENTS.md`: Testing section → Swift Testing for unit/integration, XCTest for UI tests, test commands with a concrete destination. `UPDATES.md` entry.
 
-Acceptance: `xcrun swift-format lint --strict --recursive senor-particle` exits 0; `xcodebuild test … -destination "platform=macOS,arch=arm64"` runs one passing test; both workflows green.
+Acceptance: `Package.resolved` lists aranet-kit at version `4.0.0`; `xcrun swift-format lint --strict --recursive senor-particle` exits 0; `xcodebuild test … -destination "platform=macOS,arch=arm64"` runs one passing test; both workflows green; readings arrive from a real sensor.
 
-Commits: `build(tests): add swift testing unit test target`, `ci: lint and run unit tests before archiving`, `docs(agents): adopt swift testing and 147 columns`.
+Commits: `build(deps): adopt aranet-kit 4.0.0`, `build(tests): add swift testing unit test target`, `ci: lint and run unit tests before archiving`, `docs(agents): adopt swift testing and 147 columns`.
 
 ## Phase 1: Monitoring resilience (size M)
 
@@ -524,16 +564,16 @@ Commits: `build(tests): add swift testing unit test target`, `ci: lint and run u
 
 Findings: C1, C2, C3, C4 (logging and state), C19, K4, K6, K8, A3, A1 (`MonitoredDevice.swift`).
 
-1. Create `SensorClient.swift` (A3) and `extension AranetClient: SensorClient {}`; `SensorManager.init(client:)` with the default.
+1. Inject AranetKit's `SensorClient` (A3): `SensorManager.init(client: any SensorClient = AranetClient())`. No app-local protocol.
 2. Move `MonitoredDevice` to its own file; add `connectionState` (`.connected`, `.reconnecting(attempt: Int)`, `.failed(String)`).
 3. Rewrite `monitorWithRetry`: reset the counter on success (C1), log failures with `os.Logger` (K8), set `connectionState`, `Task.sleep(for:)` with explicit cancellation handling (K4), doc comment on the backoff policy (K6, S12).
 4. Clear finished task handles (C2); add the `scanTask` handle and re-entrancy guard (C3); cancel both in `stopMonitoring()` (C19). Move the startup sequence from `AppDelegate` into `SensorManager.start()` so there is one place that scans then monitors.
-5. Tests: `SensorManagerTests` from T2 with a `FakeSensorClient` and an injected clock for the backoff schedule (so the 80-second wait is asserted, not waited for).
+5. Tests: `SensorManagerTests` from T2 with a `FakeSensorClient` conforming to AranetKit's protocol and an injected clock for the backoff schedule (so the 80-second wait is asserted, not waited for); one test cancels the monitoring task and expects the fake stream's `onTermination` (C20).
 6. `UPDATES.md` entry (bug fixes worth remembering).
 
 Acceptance: `SensorManagerTests` pass; manual check on hardware: power-cycle a sensor six times, confirm readings resume each time; trigger Rescan from the menu and from Settings in quick succession, confirm one scan.
 
-Commits: `refactor(sensors): inject sensor client protocol`, `fix(sensors): reset retry count after reading`, `fix(sensors): restart monitoring after give up`, `fix(sensors): guard concurrent rescans`, `test(sensors): cover retry and rescan behavior`.
+Commits: `refactor(sensors): inject aranetkit sensor client`, `fix(sensors): reset retry count after reading`, `fix(sensors): restart monitoring after give up`, `fix(sensors): guard concurrent rescans`, `test(sensors): cover retry and rescan behavior`.
 
 ## Phase 2: Preferences and testability (size M)
 
@@ -558,7 +598,7 @@ Commits: `refactor(prefs): add injectable preferences store`, `refactor(prefs): 
 
 Findings: C7, C8, C11, C12, C14, K2, K5, A5, A11 (first slice).
 
-1. `SensorManager` becomes the sole observer of `aranetReadingDidUpdate`; it posts `sensorDevicesDidChange` with `userInfo[deviceId]` after mutating state, and `MainActor.assertIsolated()` guards the handler (K5). Document the AranetKit main-actor contract in `AGENTS.md`.
+1. `SensorManager` becomes the sole observer of `aranetReadingDidUpdate`; it posts `sensorDevicesDidChange` with `userInfo[deviceId]` after mutating state, and `MainActor.assertIsolated()` guards the handler (K5). Cite the AranetKit 4.0.0 main-actor delivery contract in `AGENTS.md`.
 2. `AppDelegate`, `MenuManager`, `NotificationManager`, `DevicesViewController` observe `sensorDevicesDidChange` instead; remove `AppDelegate`'s `menuManager?.refreshIfNeeded()` duplication (C7).
 3. Extract `StatusTransitionTracker` (pure: `previousStatuses`, `evaluate(deviceId:status:enabled:) -> Transition?`) from `NotificationManager`; `NotificationManager` evaluates only the changed device (C12) and delivers through the async `UNUserNotificationCenter` APIs (K2), requesting authorization lazily on first enable (C11).
 4. `StatusNotificationContent` struct (A5); consider `switch`-based tables (C14).
@@ -643,6 +683,7 @@ Acceptance: product decision per item; screenshots in `docs/images` regenerated.
 4. **K8:** adopt `os.Logger` now (Phase 1) or defer? (Recommended: now; it is a one-file change plus call sites touched anyway.)
 5. **C14:** keep dictionary tables with a coverage test, or convert to `switch`? (Recommended: test first, convert only if the tables grow.)
 6. **Phase 6:** schedule, or leave as backlog?
+7. **D7:** bump AranetKit to 4.0.0 as the first step of Phase 0 (recommended; it needs one hardware run), or only when Phase 1 starts?
 
 # Part 4: Verification commands (macOS, Xcode 26)
 
