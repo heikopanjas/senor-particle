@@ -4,6 +4,15 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.0, agents.md skill cleanup 11:10)
+
+- replaced the embedded doomkit swift conventions with a pointer to the swift-coding-conventions skill plus app-target notes (internal access, appkit allowed, concurrency and testing skills)
+- replaced the duplicated commit message rules with the git-workflow skill, keeping never-commit-automatically and no agent co-authorship trailers
+- replaced the cargo.toml versioning text with project specifics: marketing_version in project.pbxproj, ci-owned build numbers, immutable release tags
+- named the version manifest in the technology stack, where the semantic-versioning skill looks for it
+- kept the project build commands and noted that the swiftpm-only swift-build-commands skill does not apply; the analyze command now passes the .build paths
+- rationale: skills are now installed project-locally, so agents.md keeps only project-specific rules and stops drifting from the shared skills
+
 ### 2026-10-22 (v1.2.0, build output in .build 10:50)
 
 - moved every generated root from build to .build: project cache settings, shared workspace settings, build.sh, both ci workflows, readme, and agents
