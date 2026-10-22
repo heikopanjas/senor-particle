@@ -36,6 +36,10 @@ class MenuManager: NSObject, NSMenuDelegate {
         settingsItem.target = self
         self.menu.addItem(settingsItem)
 
+        let aboutItem = NSMenuItem(title: "About Senor Particle", action: #selector(openAbout), keyEquivalent: "")
+        aboutItem.target = self
+        self.menu.addItem(aboutItem)
+
         self.menu.addItem(NSMenuItem.separator())
 
         self.menu.addItem(NSMenuItem(title: "Quit Se\u{00F1}or Particle", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
@@ -166,14 +170,23 @@ class MenuManager: NSObject, NSMenuDelegate {
     }
 
     @objc private func openSettings() -> Void {
+        self.resolvedSettingsWindowController()?.showAndBringToFront()
+    }
+
+    @objc private func openAbout() -> Void {
+        self.resolvedSettingsWindowController()?.showAboutAndBringToFront()
+    }
+
+    /// Lazily creates the single shared Settings window so every menu entry reuses the same tab state.
+    private func resolvedSettingsWindowController() -> SettingsWindowController? {
         if self.settingsWindowController == nil, let sensorManager = self.sensorManager {
             self.settingsWindowController = SettingsWindowController(sensorManager: sensorManager, updaterController: self.updaterController)
         }
-        self.settingsWindowController?.showAndBringToFront()
+        return self.settingsWindowController
     }
 
     private func clearDeviceItems() -> Void {
-        let fixedItemCount = 6
+        let fixedItemCount = 7
         while self.menu.items.count > fixedItemCount { self.menu.removeItem(at: 0) }
         self.deviceEntries.removeAll()
         self.deviceOrder.removeAll()

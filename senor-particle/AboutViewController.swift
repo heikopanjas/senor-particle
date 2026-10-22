@@ -62,13 +62,17 @@ final class AboutViewController: NSViewController {
 
         self.automaticChecksToggle.target = self
         self.automaticChecksToggle.action = #selector(self.automaticChecksChanged(_:))
-        self.automaticChecksToggle.frame = NSRect(x: 0, y: 30, width: contentWidth, height: 22)
-        contentView.addSubview(self.automaticChecksToggle)
-
         self.automaticDownloadsToggle.target = self
         self.automaticDownloadsToggle.action = #selector(self.automaticDownloadsChanged(_:))
-        self.automaticDownloadsToggle.frame = NSRect(x: 0, y: 0, width: contentWidth, height: 22)
-        contentView.addSubview(self.automaticDownloadsToggle)
+
+        // Center the checkboxes as one group so they stay left-aligned with each other under the centered header
+        let toggles = [self.automaticChecksToggle, self.automaticDownloadsToggle]
+        let toggleWidth = toggles.map { $0.fittingSize.width }.max() ?? contentWidth
+        let toggleX = ((contentWidth - toggleWidth) / 2).rounded()
+        for (index, toggle) in toggles.enumerated() {
+            toggle.frame = NSRect(x: toggleX, y: CGFloat(toggles.count - 1 - index) * 30, width: toggleWidth, height: 22)
+            contentView.addSubview(toggle)
+        }
     }
 
     override func viewWillAppear() -> Void {
