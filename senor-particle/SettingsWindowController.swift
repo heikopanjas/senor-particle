@@ -116,6 +116,12 @@ class SettingsWindowController: NSWindowController {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    /// Selects the About tab before showing the window so it never flashes the previously selected tab.
+    func showAboutAndBringToFront() -> Void {
+        self.switchToTab(.about)
+        self.showAndBringToFront()
+    }
+
     // MARK: - Tab switching
 
     @objc private func showGeneral() -> Void { self.switchToTab(.general) }

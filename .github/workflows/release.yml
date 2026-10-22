@@ -15,21 +15,22 @@ env:
   PROJECT: senor-particle.xcodeproj
   SCHEME: senor-particle
   APP_NAME: Senor Particle
-  BUILD_DIR: Build/CI
-  ARCHIVE_PATH: Build/CI/Senor Particle.xcarchive
-  EXPORT_PATH: Build/CI/export
+  BUILD_DIR: .build/CI
+  DERIVED_DATA_PATH: .build/DerivedData/CI
+  ARCHIVE_PATH: .build/CI/Senor Particle.xcarchive
+  EXPORT_PATH: .build/CI/export
   EXPORT_PLIST: exportOptions.plist
-  APP_PATH: Build/CI/export/Senor Particle.app
-  NOTARY_ZIP: Build/CI/SenorParticle-notarization.zip
-  CHANGELOG_PATH: Build/CI/CHANGELOG.md
-  BOM_PATH: Build/CI/BILL_OF_MATERIALS.md
-  PACKAGE_DIR: Build/CI/package
-  UPDATE_DIR: Build/CI/sparkle
-  APPCAST_INPUT_DIR: Build/CI/sparkle/input
-  APPCAST_PATH: Build/CI/sparkle/appcast.xml
-  UPDATE_PUBLICATION_DIR: Build/CI/sparkle/publication
+  APP_PATH: .build/CI/export/Senor Particle.app
+  NOTARY_ZIP: .build/CI/SenorParticle-notarization.zip
+  CHANGELOG_PATH: .build/CI/CHANGELOG.md
+  BOM_PATH: .build/CI/BILL_OF_MATERIALS.md
+  PACKAGE_DIR: .build/CI/package
+  UPDATE_DIR: .build/CI/sparkle
+  APPCAST_INPUT_DIR: .build/CI/sparkle/input
+  APPCAST_PATH: .build/CI/sparkle/appcast.xml
+  UPDATE_PUBLICATION_DIR: .build/CI/sparkle/publication
   UPDATE_RELEASE_TAG: sparkle-updates
-  PACKAGE_CACHE_DIR: Build/SourcePackages
+  PACKAGE_CACHE_DIR: .build/SourcePackages
   PACKAGE_RESOLVED: senor-particle.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
   DESTINATION: generic/platform=macOS
 
@@ -65,6 +66,7 @@ jobs:
             -scheme "$SCHEME" \
             -configuration Release \
             -destination "$DESTINATION" \
+            -derivedDataPath "$DERIVED_DATA_PATH" \
             -clonedSourcePackagesDirPath "$PACKAGE_CACHE_DIR" \
             -showBuildSettings)"
           APP_VERSION="$(printf '%s\n' "$BUILD_SETTINGS" | awk '/MARKETING_VERSION/ { print $3; exit }')"
@@ -142,7 +144,7 @@ jobs:
       - name: Clean Release Artifacts
         run: |
           set -euo pipefail
-          rm -rf "$BUILD_DIR"
+          rm -rf "$BUILD_DIR" "$DERIVED_DATA_PATH"
           mkdir -p "$BUILD_DIR"
 
       - name: Resolve Package Dependencies
@@ -151,6 +153,7 @@ jobs:
           xcodebuild -resolvePackageDependencies \
             -project "$PROJECT" \
             -scheme "$SCHEME" \
+            -derivedDataPath "$DERIVED_DATA_PATH" \
             -clonedSourcePackagesDirPath "$PACKAGE_CACHE_DIR"
           test -x "$PACKAGE_CACHE_DIR/artifacts/sparkle/Sparkle/bin/generate_appcast"
 
@@ -164,6 +167,7 @@ jobs:
             -scheme "$SCHEME" \
             -configuration Release \
             -destination "$DESTINATION" \
+            -derivedDataPath "$DERIVED_DATA_PATH" \
             -clonedSourcePackagesDirPath "$PACKAGE_CACHE_DIR" \
             -archivePath "$ARCHIVE_PATH" \
             CODE_SIGN_STYLE=Manual \

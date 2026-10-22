@@ -1,6 +1,6 @@
 # Project Instructions for AI Coding Agents
 
-**Last updated:** 2026-07-26
+**Last updated:** 2026-10-22
 
 <!-- {mission} -->
 
@@ -65,11 +65,12 @@ When initializing a session or analyzing the workspace, refer to instruction fil
 
 - Maintain the "Last updated" timestamp at the top
 - Add content to the relevant section (Project Overview, Coding Standards, etc.)
-- Add entries to the "Recent Updates & Decisions" log at the bottom with:
+- Add entries to the "Recent Updates & Decisions" log in `UPDATES.md`, directly below the `<!-- {changelog} -->` marker, newest first, with:
   - Date (with time if multiple updates per day)
   - Brief description
   - Reasoning for the change
-- Preserve this structure: title header → timestamp → main instructions → "Recent Updates & Decisions" section
+- Never edit or delete existing `UPDATES.md` entries; the `recent-updates` skill defines the full entry format
+- Preserve this structure: title header → timestamp → main instructions
 
 ## Best Practices
 
@@ -80,7 +81,7 @@ When initializing a session or analyzing the workspace, refer to instruction fil
 3. **Document Changes**: Update documentation when changing functionality
 4. **Code Review**: [Describe your code review process]
 5. **Date Changes**: Update the "Last updated" timestamp in this file when making changes
-6. **Log Updates**: Add entries to "Recent Updates & Decisions" section below
+6. **Log Updates**: Add entries to the "Recent Updates & Decisions" log in `UPDATES.md`
 
 ### Development Guidelines
 
@@ -101,6 +102,8 @@ When initializing a session or analyzing the workspace, refer to instruction fil
 - **Settings Help Text**: General settings controls include concise secondary explanatory text beneath each control. Keep this copy action-oriented and focused on user-visible behavior rather than implementation details
 - **Devices Settings Hierarchy**: Keep the Devices settings surface table-based, but use `NSOutlineView` when showing hierarchical device content. Device rows stay top-level with editable name and notification controls; metric rows are children used for menu bar display selection
 - **Settings View Controllers**: Keep each Settings tab controller in its own source file (`GeneralViewController.swift`, `DevicesViewController.swift`, `AdvancedSettingsViewController.swift`) and keep `SettingsWindowController.swift` focused on window, toolbar, and shared preference helper types
+- **App Branding**: Every user-visible app name reads `Señor Particle`. Swift code uses `Bundle.main.displayName` (`Bundle+DisplayName.swift`), backed by `CFBundleDisplayName` in `Info.plist`, so system surfaces (notifications, Login Items, permission prompts, Sparkle dialogs) match the app UI. The ASCII `Senor Particle` is reserved for `PRODUCT_NAME`, bundle and archive file names, scripts, and CI, so paths stay stable for builds and existing installations
+- **About Entry Point**: The status menu has an `About Señor Particle` item directly below `Settings…` that opens the shared Settings window directly on the About tab through `SettingsWindowController.showAboutAndBringToFront()`. Do not add a separate About window. The About tab's update checkboxes are centered as one group under the centered header while staying left-aligned with each other
 - **Automatic Updates**: Use one long-lived `SPUStandardUpdaterController` owned by `AppDelegate` and pass it explicitly through `MenuManager` to `SettingsWindowController` and `AboutViewController`. Keep all update UI in Settings > About; bind the manual check button to `canCheckForUpdates` and use Sparkle's `automaticallyChecksForUpdates` and `automaticallyDownloadsUpdates` properties directly instead of duplicating preferences. Preserve Sparkle's second-launch consent prompt and notification-before-install defaults
 - **Sparkle Security**: Require EdDSA-signed archives and signed feeds with `SUVerifyUpdateBeforeExtraction` and `SURequireSignedFeed`. Keep the public key in `Info.plist`, the private key only in the `SPARKLE_ED_PRIVATE_KEY` repository secret plus an offline backup, and pass it to `generate_appcast` through standard input. Sandboxed builds use direct outgoing network access, the Installer Launcher service, and the `-spks`/`-spki` Mach lookup exceptions; do not enable Sparkle's Downloader service
 - **Update Cycle Progress**: Each sensor in the menu shows an `UpdateCycleProgressView` below the timestamp. Cycle position = `reading.ago at receive + time since lastUpdated`, repeating every interval via modulo while the menu stays open. Fill color fades from light green opaque to light green at 37% opacity. New readings re-anchor via `MonitoredDevice.updateSequence`. After a configurable number of missed intervals without a reading (**Degraded situation**, default 3, Settings > Advanced), the bar shows full opaque dark red. UI refresh during menu tracking uses `MenuTrackingRefresh` (`.common` run loop); reading delivery relies on AranetKit monitor timers and `Notification.Name.aranetReadingDidUpdate`
@@ -1500,19 +1503,17 @@ open senor-particle.xcodeproj
 ### Development (Command Line)
 
 Always pass `-destination "generic/platform=macOS"` to avoid ambiguous destination warnings.
-Debug builds write the app bundle to `Build/Products/Debug/Senor Particle.app` inside the repository.
-Xcode-generated caches, indexes, logs, SDK stat caches, and Swift package checkouts are routed under `Build/`.
-Derived Data is configured as a project-relative `Build` location via workspace settings.
+`.build/` is the only supported generated root. Xcode products, intermediates, caches, indexes, logs, SDK stat caches, Swift package checkouts, local distribution output, and CI staging all remain below it. Project build settings route module, compilation, index, log, SDK stat, and package caches to `$(PROJECT_DIR)/.build/...`. The shared workspace settings give the Xcode IDE a custom workspace-relative build location (`.build/Products`, `.build/Intermediates`) and Derived Data in `.build/DerivedData`, so IDE Debug builds write `.build/Products/Debug/Senor Particle.app`. `xcodebuild` ignores shared workspace settings, so scripted builds must pass `-derivedDataPath` and `-clonedSourcePackagesDirPath` explicitly; with default Xcode Locations preferences their products land in `.build/DerivedData/CLI/Build/Products`. Do not add project-level `SYMROOT` or `OBJROOT` overrides because Xcode treats those as legacy build locations and rejects Swift package dependencies.
 
 ```bash
 # Build the project (debug)
-xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -destination "generic/platform=macOS" -configuration Debug build
+xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -destination "generic/platform=macOS" -configuration Debug -derivedDataPath .build/DerivedData/CLI -clonedSourcePackagesDirPath .build/SourcePackages build
 
 # Run tests
-xcodebuild test -project senor-particle.xcodeproj -scheme senor-particle -destination "generic/platform=macOS"
+xcodebuild test -project senor-particle.xcodeproj -scheme senor-particle -destination "generic/platform=macOS" -derivedDataPath .build/DerivedData/CLI -clonedSourcePackagesDirPath .build/SourcePackages
 
 # Clean build artifacts
-xcodebuild clean -project senor-particle.xcodeproj -scheme senor-particle -destination "generic/platform=macOS"
+xcodebuild clean -project senor-particle.xcodeproj -scheme senor-particle -destination "generic/platform=macOS" -derivedDataPath .build/DerivedData/CLI -clonedSourcePackagesDirPath .build/SourcePackages
 ```
 
 ### Build & Deploy
@@ -1535,7 +1536,7 @@ Use `build.sh` for archive, export, and optional notarization:
 
 ### Continuous Integration
 
-`.github/workflows/build.yml` runs signed ARM64 Developer ID builds on pushes and pull requests for `develop` and `feature/**`. `.github/workflows/release.yml` validates pull requests targeting `main`, then runs on pushes to `main` after merge. Both import the signing certificate into temporary runner storage, archive and export the app, verify its signature and architecture, generate `CHANGELOG.md` and `BILL_OF_MATERIALS.md`, and upload the packaged zip. The release workflow alone uses versioned release artifact names and performs Apple notarization, stapling, and Gatekeeper verification. It resolves Swift packages into `Build/SourcePackages` with `-clonedSourcePackagesDirPath`, then uses the Sparkle publishing tool from that deterministic artifact directory. It also creates a notarized app-only Sparkle archive, generates an EdDSA-signed appcast with deltas disabled, and validates the feed during pull requests. Post-merge, it publishes the normal `v<MARKETING_VERSION>` release, uploads versioned archives and notes to the mutable `sparkle-updates` prerelease, then deploys only `appcast.xml` to GitHub Pages. Update assets must be published before the feed. Release publication is retry-safe only when an existing version tag targets the same commit; otherwise increment `MARKETING_VERSION`. Use `GITHUB_RUN_NUMBER` as the monotonically increasing `CFBundleVersion`. Both workflows use `macos-26`, `actions/checkout@v6`, and `actions/upload-artifact@v6`; publication uses `actions/download-artifact@v8`, and Pages uses the official configure, upload, and deploy actions.
+`.github/workflows/build.yml` runs signed ARM64 Developer ID builds on pushes and pull requests for `develop` and `feature/**`. `.github/workflows/release.yml` validates pull requests targeting `main`, then runs on pushes to `main` after merge. Both import the signing certificate into temporary runner storage, use `.build/DerivedData/CI` plus `.build/SourcePackages`, stage distribution files under `.build/CI`, archive and export the app, verify its signature and architecture, generate `CHANGELOG.md` and `BILL_OF_MATERIALS.md`, and upload the packaged zip. The release workflow alone uses versioned release artifact names and performs Apple notarization, stapling, and Gatekeeper verification. It uses the Sparkle publishing tool from the deterministic package artifact directory. It also creates a notarized app-only Sparkle archive, generates an EdDSA-signed appcast with deltas disabled, and validates the feed during pull requests. Post-merge, it publishes the normal `v<MARKETING_VERSION>` release, uploads versioned archives and notes to the mutable `sparkle-updates` prerelease, then deploys only `appcast.xml` to GitHub Pages. Update assets must be published before the feed. Release publication is retry-safe only when an existing version tag targets the same commit; otherwise increment `MARKETING_VERSION`. Use `GITHUB_RUN_NUMBER` as the monotonically increasing `CFBundleVersion`. Both workflows use `macos-26`, `actions/checkout@v6`, and `actions/upload-artifact@v6`; publication uses `actions/download-artifact@v8`, and Pages uses the official configure, upload, and deploy actions.
 
 The build workflow requires repository secrets `APPLE_CERTIFICATE_P12_BASE64`, `APPLE_CERTIFICATE_PASSWORD`, and `APPLE_SIGNING_IDENTITY`. The release workflow additionally requires `APPSTORE_CONNECT_KEY_ID`, `APPSTORE_CONNECT_ISSUER_ID`, and `APPSTORE_CONNECT_KEY_P8_BASE64` for App Store Connect API key notarization plus `SPARKLE_ED_PRIVATE_KEY` for appcast/update signing, for seven secrets in total. The Sparkle key uses Keychain account `com.panjas.senor-particle`; retain an encrypted offline backup of its exported private key. The non-sensitive team ID is read from `exportOptions.plist`. Configure repository Pages with GitHub Actions as its source. Version 1.1.0 is the Sparkle bootstrap release, so 1.0 installations require one final manual upgrade.
 
@@ -1546,10 +1547,10 @@ The build workflow requires repository secrets `APPLE_CERTIFICATE_P12_BASE64`, `
 # File > Add Packages... in Xcode
 
 # Update package dependencies
-xcodebuild -resolvePackageDependencies -project senor-particle.xcodeproj
+xcodebuild -resolvePackageDependencies -project senor-particle.xcodeproj -scheme senor-particle -derivedDataPath .build/DerivedData/CLI -clonedSourcePackagesDirPath .build/SourcePackages
 
 # Show resolved package versions
-xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -showBuildSettings | grep PACKAGE
+xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -destination "generic/platform=macOS" -derivedDataPath .build/DerivedData/CLI -clonedSourcePackagesDirPath .build/SourcePackages -showBuildSettings | grep PACKAGE
 ```
 
 ### Code Quality
@@ -1702,115 +1703,3 @@ After making ANY code changes:
 4. Mention version bump in commit message footer if significant
 
 **Note:** Version changes should be included in the commit with the actual code changes, not as a separate commit.
-
----
-
-## Recent Updates & Decisions
-
-### 2026-07-26
-
-- **Release 1.1.1 patch version**: Incremented `MARKETING_VERSION` from 1.1.0 to 1.1.1 for the post-bootstrap CI and About-layout fixes. Release tags are immutable: once `v1.1.0` identifies its published source commit, later changes must use a new semantic version rather than replacing that release
-- **Centered About settings content**: Group the About tab's app identity and Sparkle controls in one fixed-size container with flexible horizontal and vertical margins so the complete block remains centered when the shared Settings window is resized or switched from another tab
-- **Deterministic Sparkle publishing tools in CI**: The release workflow now passes `-clonedSourcePackagesDirPath Build/SourcePackages` to package resolution, build-settings inspection, and archive creation, then invokes `generate_appcast` from that exact artifact directory. GitHub-hosted runners otherwise place package artifacts in an opaque Derived Data path outside the repository, causing the earlier `find Build` lookup to fail even though Sparkle was linked successfully
-- **Sparkle automatic updates**: Added Sparkle 2.9.4 through Swift Package Manager with one updater controller owned by `AppDelegate` and an About settings tab for manual checks, automatic-check consent, and automatic downloads. Signed app-only updates are hosted in a dedicated `sparkle-updates` GitHub prerelease, while a signed appcast is deployed to GitHub Pages only after its archive exists. The sandbox permits direct HTTPS update access and Sparkle Installer Launcher communication; archives and the feed use a repository-specific EdDSA key. Release 1.1.0 bootstraps updates, full archives ship first, and deltas remain deferred
-- **Stable AranetKit package release**: Changed the remote Swift package requirement from the temporary `develop` branch pin to `upToNextMajorVersion` starting at `3.5.2`. Release `v3.5.2` includes the notification API required by the app, so the project can use stable semantic-version updates while `Package.resolved` continues to pin reproducible builds
-- **Apple-silicon-only builds**: Set the project-level `ARCHS` build setting to `arm64` for Debug and Release configurations. The app no longer builds or distributes an `x86_64` slice because supported deployments target Apple silicon exclusively; the shared setting also applies to command-line archives and Swift package dependencies
-- **GitHub Actions build and release pipelines**: Added Token Torch-inspired `.github/workflows/build.yml` and `.github/workflows/release.yml`. Build runs for pushes and pull requests on `develop` and `feature/**`; release runs for pull requests targeting `main`. Both produce signed ARM64 Developer ID artifacts with changelog and dependency BOM metadata, while release alone applies versioned naming and performs Apple notarization, stapling, and Gatekeeper verification
-- **App Store Connect API key notarization**: Configured the release workflow to authenticate `notarytool` with the same issuer ID, key ID, and base64-encoded `.p8` secret pattern as AranetKit. API key authentication avoids storing an Apple ID app-specific password and supports submission-log retrieval when notarization fails
-- **Profile-free Developer ID signing**: Removed the `Senor Particle macOS` provisioning profile from CI and `exportOptions.plist` after verifying a signed archive retains App Sandbox, Bluetooth, and user-selected-file entitlements without an embedded profile. The six-secret contract now matches AranetKit: certificate, certificate password, signing identity, and three App Store Connect API key values; the non-sensitive team ID remains in `exportOptions.plist`
-- **Post-merge GitHub releases**: Extended `release.yml` to run on pushes to `main` as well as pull requests targeting it. Pull requests validate the complete signed and notarized artifact without publishing; the post-merge run downloads that run's packaged artifact into a write-scoped job and creates the `v<MARKETING_VERSION>` GitHub release. Existing version tags fail before signing to prevent accidental replacement
-
-### 2026-07-25
-
-- **Radiation measurement duration metric**: Added a `radiationDuration` case to `StatusBarDisplayMetric`, sourced from the Aranet Radiation `AranetReading.radiationDuration` value (measurement period in seconds). It renders in the menu as `Duration` in days (`%.1f d`) and is ordered immediately after `Total dose`. The value is unit-system independent (days for both metric and imperial). This surfaces how long the cumulative total dose was integrated over so users can interpret the total dose in context
-- **Remote AranetKit package dependency**: Replaced the sibling `../aranet-kit` package reference with the GitHub repository at <https://github.com/heikopanjas/aranet-kit> on the `develop` branch. The app requires `Notification.Name.aranetReadingDidUpdate`, which is available on `develop` but not in the latest stable `v3.2.0` tag, so the branch requirement preserves current notification-driven updates while making package resolution independent of a local checkout. Track the shared `Package.resolved` file to pin the exact branch revision for reproducible application builds
-
-### 2025-12-23
-
-- **Project initialization**: Set up senor-particle as macOS menu bar application
-- **Mission defined**: Read and display Aranet4 and Aranet Radiation sensor data via Bluetooth
-- **Technology stack**: Swift with Cocoa (AppKit) framework, using aranet-kit library for sensor communication
-- **Architecture decision**: Use [aranet-kit](https://github.com/heikopanjas/aranet-kit.git) package for all Bluetooth operations instead of implementing CoreBluetooth from scratch. This provides a clean async/await API and handles all sensor protocols (Aranet4, Aranet2, Aranet Radiation, Aranet Radon Plus)
-- **Architecture guidelines**: Established patterns for menu bar integration, AranetKit integration, and periodic monitoring
-- **Build system**: Configured for Xcode-based development with Swift Package Manager dependencies
-- **Coding standards**: Adopted comprehensive Swift conventions from DoomKit guidelines (4-space indentation, explicit access control, async/await for concurrency)
-
-### 2026-03-12
-
-- **Replaced Pomodoro scaffolding with Aranet sensor functionality**: Removed Task, TaskStatus, TaskTimes models and TaskView from Sarah Reichelt tutorial starter code
-- **Added aranet-kit SPM dependency**: Configured in pbxproj using develop branch from <https://github.com/heikopanjas/aranet-kit.git>
-- **Bluetooth permissions**: Created entitlements file with com.apple.security.device.bluetooth for App Sandbox, added NSBluetoothAlwaysUsageDescription to build settings
-- **Architecture: SensorManager pattern**: Single AranetClient instance for all devices. AranetKit isolates per-peripheral state via ReadOperation so concurrent monitoring is safe. Uses AranetKit monitor() AsyncStream for smart scheduling
-- **Architecture: Programmatic menu**: Menu is now built entirely in code (removed storyboard menu dependency). MenuManager populates device items on menuWillOpen and clears on menuDidClose
-- **File structure**: AppDelegate.swift (entry point, scan/monitor orchestration), SensorManager.swift (device scanning and monitoring), MenuManager.swift (menu lifecycle), SensorDeviceView.swift (custom NSView per device)
-- **Status bar display**: Shows first available reading's key metric (CO2 ppm for Aranet4, radiation rate for Aranet Radiation, temperature for Aranet2)
-
-### 2026-03-14
-
-- **Updated AranetKit to e0bffa8**: Picked up multi-device support (e170d85), DRY refactoring (56d409e), and native radiation status parsing (e0bffa8). Updated Package.resolved pin from 97dcfe7 to e0bffa8
-- **Simplified SensorDeviceView.effectiveStatus()**: Removed manual radiation dose-rate threshold logic (0.3/1.0 uSv/h boundaries). AranetKit now parses the native status byte (byte 27) for Aranet Radiation, so reading.status is populated for all device types except Aranet2
-- **Adopted AranetKit default scan timeout**: Removed explicit 10s timeout from SensorManager.scan(), using AranetKit new 15s default for better device discovery
-
-### 2026-03-22
-
-- **Switched aranet-kit to published version**: Changed SPM dependency from branch-based (develop) to version-based (upToNextMajorVersion from 3.2.0) now that the package is published on GitHub with tagged releases
-
-### 2026-05-20
-
-- **Carrot-inspired notification copy**: Replaced generic GREEN/YELLOW/RED transition messages with data-first, personality-configurable copy in `StatusNotificationCopy.swift`. Added `NotificationPersonality` enum (Professional, Friendly, Snarky, Overkill) with Settings picker in General tab. Notifications use custom device display names and include live metric values from `AranetReading`
-- **Removed Homicidal personality**: Dropped homicidal notification tone level; four personalities remain
-- **Update cycle progress bar**: Added `UpdateCycleProgressView` below each sensor in the menu dropdown. Shows elapsed fraction of the device update interval with live color shift from green to red; uses `reading.ago`, `reading.interval`, and `lastUpdated`
-- **Live menu updates**: Progress bar timer uses `RunLoop.main` `.common` mode for updates while menu is tracked; `MenuManager` refreshes sensor views in place instead of rebuilding menu items on each reading
-- **Progress bar states**: Green fade cycles every interval while menu is open; dark red full after three missed intervals
-- **Menu tracking UI refresh**: Added `MenuTrackingRefresh` to schedule status bar and menu view updates on `RunLoop.main` `.common` mode. `MenuManager` observes `Notification.Name.aranetReadingDidUpdate` and forces view redraw after in-place configure so sensor values update while the menu is open
-- **In-place menu row updates**: `SensorDeviceView` reuses persistent metric row fields instead of removing and recreating subviews on each reading; AppKit does not repaint rebuilt subviews during menu tracking. `MenuManager` reassigns `NSMenuItem.view` after updates to force menu item redraw
-- **Menu-open sensor polling**: Root cause of stale menu/status values while menu open is AranetKit monitor timers using default run loop mode (paused during menu tracking). Fixed upstream in AranetKit; app listens to `Notification.Name.aranetReadingDidUpdate` only
-
-### 2026-06-27
-
-- **Status item metric selector**: Added a Settings > Devices outline hierarchy where each sensor expands to selectable metric rows. The selected device UUID and metric choices are persisted through `StatusBarDisplayPreferences`, and `AppDelegate` refreshes the status item on preference changes so users can pin the menu bar display to specific sensor values
-- **Shared metric formatting**: Centralized displayable Aranet metrics in `StatusBarDisplayMetric` so status item titles, Settings metric rows, and menu dropdown readings share labels and formatting, including radon concentration
-- **Debug build output path**: Set the target Debug `CONFIGURATION_BUILD_DIR` to `$(PROJECT_DIR)/Build/Products/Debug` so command-line and Xcode debug builds produce `Build/Products/Debug/Senor Particle.app` in the repository. Keep Swift, library, and framework search paths pointed at `$(BUILD_DIR)/$(CONFIGURATION)` so local Swift package products remain discoverable
-- **Xcode generated directory locations**: Project build settings plus workspace Derived Data settings route `CompilationCache.noindex`, `Index.noindex`, `ModuleCache.noindex`, `SDKStatCaches.noindex`, `SourcePackages`, and `Logs` under `Build/` so repository-root Xcode artifacts stay contained
-- **Project-relative Derived Data**: Added workspace settings for project-relative Derived Data at `Build`, which keeps `SourcePackages`, `Logs`, and `Index.noindex` under the repository `Build/` hierarchy while explicit build settings keep compilation, module, and SDK stat caches there too
-- **Text-only status item values**: Removed sensor icons from the menu bar value display so selected metrics render as text only, while placeholder states can continue to use the scanning symbol
-- **Dual status item display**: Expanded status item selection to up to two ordered metrics from the same device. The Devices outline uses constrained checkboxes, and `StatusItemDisplayView` renders selected or automatic values inside the single `NSStatusItem` as one vertical label (`AIR` or `RAD`) with one or two value rows
-
-### 2026-06-27 (code review + DRY cleanup)
-
-- **BatteryView symbol fix**: Removed the redundant `level < 7` branch in `batterySymbolName(for:)` that returned the same `battery.0percent` glyph as `level < 13` (SF Symbols has no 10% glyph). Promoted the critical red-tint threshold to a named `criticalBatteryThreshold` constant
-- **Metric formatting deduplicated**: `StatusNotificationCopy.metricClause(for:)` now reuses `StatusBarDisplayMetric.valueString(for:)` instead of re-implementing CO2/radiation/radon number formatting. Removed the unused `StatusBarDisplayMetric.statusItemTitle(for:)` dead code
-- **Shared label styling**: Added `NSTextField.applyPlainLabelStyle()` (`NSTextField+PlainLabel.swift`) and adopted it in `SensorDeviceView` and `BatteryView` to remove duplicated transparent-label setup. Did not introduce speculative `AppColors`/`AppTypography`/`AppSpacing` token enums since each color/font/spacing value is used in exactly one place (the differing greens are intentionally distinct status-badge vs progress-bar visuals)
-- **Centralized scan-timeout preference**: Added `ScanPreferences` (key, default, resolved value) so `SensorManager` and `SettingsWindowController` no longer duplicate the `scanTimeout` UserDefaults key, the `15` default, or the fallback logic. Replaced `print` in `AppDelegate` scan failure with `NSLog`
-- **Settings outline checkbox helper**: Extracted `checkboxCell(identifier:action:in:)` mirroring the existing `textCell()` to remove duplicated make-or-create button boilerplate in the notifications and menu-bar columns
-- **Concurrency verified, no change**: Confirmed AranetKit posts `aranetReadingDidUpdate` only from `@MainActor`-isolated functions (synchronous `NotificationCenter.post`), so `SensorManager` and `NotificationManager` reading handlers already run on the main thread. The earlier-flagged dictionary race cannot occur; no dispatch hops were added
-
-### 2026-06-27 (display unit setting)
-
-- **General display unit preference**: Added Metric and Imperial display units in Settings > General. The effective default follows macOS `Locale.current.measurementSystem` until the user chooses a value, and changes post `displayUnitSystemPreferenceDidChange` for live status/menu refresh
-- **Centralized unit conversion**: `StatusBarDisplayMetric.valueString(for:)` now owns metric/imperial conversion for temperature, pressure, radiation, and radon so all display and notification surfaces stay aligned
-
-### 2026-06-27 (advanced settings)
-
-- **Advanced tab**: Moved the Degraded situation missed-cycle slider from Settings > General to Settings > Advanced and added compact explanatory copy below the slider describing stale readings and the dark red progress state
-
-### 2026-06-27 (settings help text)
-
-- **General tab explanations**: Added concise secondary text below Start at Login, Notification Personality, Units, and Scan timeout controls so Settings communicates user-visible effects directly in the UI
-
-### 2026-06-27 (general settings cleanup)
-
-- **Removed General rescan control**: Removed Rescan from Settings > General to keep the tab focused on persistent preferences; rescan remains available from device-focused surfaces
-
-### 2026-06-27 (strict concurrency + settings split)
-
-- **Swift 6 strict concurrency**: Updated the app target to Swift 6 with `SWIFT_STRICT_CONCURRENCY = complete` while retaining approachable concurrency and MainActor default isolation. This makes concurrency diagnostics enforceable during normal Xcode builds
-- **Settings controller file structure**: Split Settings tab controllers into `GeneralViewController.swift`, `DevicesViewController.swift`, and `AdvancedSettingsViewController.swift`, leaving `SettingsWindowController.swift` focused on window and toolbar coordination. This keeps one primary UI controller per file and avoids implicitly unwrapped AppKit view properties
-
-### 2026-06-27 (commit authorship)
-
-- **No agent co-authorship trailers**: Updated commit workflow guidance so commits and amended commits never include agent co-authorship trailers. This keeps project history attributed only to the human author
-
-### 2026-06-27 (initial status placeholder)
-
-- **Animated scanning placeholder**: Replaced the static menu bar scanning placeholder with `StatusItemPlaceholderView`, a compact radio-wave pulse around the `antenna.radiowaves.left.and.right` SF Symbol. The placeholder uses a `.common` run-loop timer so it keeps animating while menus are tracked, and `AppDelegate` removes/stops it as soon as real status values are available

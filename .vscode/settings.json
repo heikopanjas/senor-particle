@@ -1,0 +1,7 @@
+{
+   "chat.tools.terminal.autoApprove": {
+      "set": true,
+      "printf": true,
+      "/usr/libexec/PlistBuddy": true
+   }
+}
