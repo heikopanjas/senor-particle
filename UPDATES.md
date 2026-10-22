@@ -4,6 +4,40 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.3.0, code review fixes on aranetkit 4.0.0 14:50)
+
+- bumped aranetkit to 4.0.0; sensormanager takes a sensorclient, consumes one monitor stream per device, and posts sensordevicesdidchange for the menu, status item, devices tab, and notifications
+- reconnects back off 5 to 80 seconds, a reading resets the count, and a device that gives up shows a failed connection state until rescan; failed scans show their reason and retry after 30 seconds
+- moved all preferences into an injected preferencesstore that posts preferencesdidchange only on real changes; storage keys are unchanged and the legacy single status bar metric migrates
+- extracted pure models (status bar selection, transition tracker, notification content, update cycle calculator, battery level) and added the senorparticletests swift testing target
+- notification permission is requested when a device's notifications are enabled, not at launch
+- ci now runs swift-format lint and the unit tests with and without thread sanitizer; warnings are errors
+- rationale: implements phases 0 to 5 of code_review.md; a10, c15, and t4 stay deferred because they need visual verification
+- version: 1.2.0 to 1.3.0, minor, because the connection state and scan error ui are new behavior
+
+### 2026-10-22 (v1.2.0, code review re-checked against aranetkit 4.0.0 13:55)
+
+- re-checked every aranetkit-dependent finding in code_review.md against aranetkit 4.0.0 (released today): c3 drops from high to medium because concurrent scans no longer hang inside the library, k5 now rests on a documented main-actor delivery contract, a3 adopts aranetkit's own sensorclient protocol instead of an app-local one, c4 and c5 get real error messages from localizederror
+- added c20 (3.5.2 kept polling a device after the app cancelled its monitoring task; 4.0.0 stops the loop when the iteration ends) and d7 (the project pins aranetkit below 4.0.0 with uptonextmajorversion from 3.5.2; the bump is phase 0 step 0 and needs one hardware run)
+- rationale: the plan must target the dependency the app will ship with, and 4.0.0 removes two of the review's defects at the source
+- version: stays 1.2.0, documentation only
+
+### 2026-10-22 (v1.2.0, code review fix plan 08:57)
+
+- added code_review.md with the findings of a full static review against the swift-coding-conventions, swift-concurrency-pro, and swift-testing-pro skills, plus a six-phase fix plan with milestones and verification commands
+- pointed the code review bullet in agents.md at that plan
+- rationale: the review found monitoring resilience bugs, a missing test target, and convention drift; one tracked plan keeps the fixes ordered by dependency
+- version: stays 1.2.0, documentation only
+
+### 2026-10-22 (v1.2.0, agents.md skill cleanup 11:10)
+
+- replaced the embedded doomkit swift conventions with a pointer to the swift-coding-conventions skill plus app-target notes (internal access, appkit allowed, concurrency and testing skills)
+- replaced the duplicated commit message rules with the git-workflow skill, keeping never-commit-automatically and no agent co-authorship trailers
+- replaced the cargo.toml versioning text with project specifics: marketing_version in project.pbxproj, ci-owned build numbers, immutable release tags
+- named the version manifest in the technology stack, where the semantic-versioning skill looks for it
+- kept the project build commands and noted that the swiftpm-only swift-build-commands skill does not apply; the analyze command now passes the .build paths
+- rationale: skills are now installed project-locally, so agents.md keeps only project-specific rules and stops drifting from the shared skills
+
 ### 2026-10-22 (v1.2.0, build output in .build 10:50)
 
 - moved every generated root from build to .build: project cache settings, shared workspace settings, build.sh, both ci workflows, readme, and agents

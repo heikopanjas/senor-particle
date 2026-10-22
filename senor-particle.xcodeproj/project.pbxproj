@@ -11,14 +11,30 @@
 		42C0A0012F90000100A00001 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 42C0A0032F90000100A00001 /* Sparkle */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		42D000072F90000100A00001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 428A103F2EFAC80A00825D79 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 428A10462EFAC80A00825D79;
+			remoteInfo = "senor-particle";
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		428A10472EFAC80A00825D79 /* Senor Particle.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Senor Particle.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		42D000012F90000100A00001 /* SenorParticleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SenorParticleTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		428A10492EFAC80A00825D79 /* senor-particle */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "senor-particle";
+			sourceTree = "<group>";
+		};
+		42D000022F90000100A00001 /* SenorParticleTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SenorParticleTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -33,6 +49,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		42D000032F90000100A00001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -40,6 +63,7 @@
 			isa = PBXGroup;
 			children = (
 				428A10492EFAC80A00825D79 /* senor-particle */,
+				42D000022F90000100A00001 /* SenorParticleTests */,
 				428A10482EFAC80A00825D79 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -48,6 +72,7 @@
 			isa = PBXGroup;
 			children = (
 				428A10472EFAC80A00825D79 /* Senor Particle.app */,
+				42D000012F90000100A00001 /* SenorParticleTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -79,6 +104,29 @@
 			productReference = 428A10472EFAC80A00825D79 /* Senor Particle.app */;
 			productType = "com.apple.product-type.application";
 		};
+		42D000062F90000100A00001 /* SenorParticleTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 42D0000B2F90000100A00001 /* Build configuration list for PBXNativeTarget "SenorParticleTests" */;
+			buildPhases = (
+				42D000042F90000100A00001 /* Sources */,
+				42D000032F90000100A00001 /* Frameworks */,
+				42D000052F90000100A00001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				42D000082F90000100A00001 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				42D000022F90000100A00001 /* SenorParticleTests */,
+			);
+			name = SenorParticleTests;
+			packageProductDependencies = (
+			);
+			productName = SenorParticleTests;
+			productReference = 42D000012F90000100A00001 /* SenorParticleTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -91,6 +139,10 @@
 				TargetAttributes = {
 					428A10462EFAC80A00825D79 = {
 						CreatedOnToolsVersion = 26.2;
+					};
+					42D000062F90000100A00001 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 428A10462EFAC80A00825D79;
 					};
 				};
 			};
@@ -113,12 +165,20 @@
 			projectRoot = "";
 			targets = (
 				428A10462EFAC80A00825D79 /* senor-particle */,
+				42D000062F90000100A00001 /* SenorParticleTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		428A10452EFAC80A00825D79 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		42D000052F90000100A00001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -135,7 +195,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		42D000042F90000100A00001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		42D000082F90000100A00001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 428A10462EFAC80A00825D79 /* senor-particle */;
+			targetProxy = 42D000072F90000100A00001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		428A10532EFAC80A00825D79 /* Debug */ = {
@@ -301,7 +376,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.2.0;
+				MARKETING_VERSION = 1.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.panjas.senor-particle";
 				PRODUCT_MODULE_NAME = senor_particle;
 				PRODUCT_NAME = "Senor Particle";
@@ -311,6 +386,7 @@
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 6.0;
 			};
@@ -339,7 +415,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.2.0;
+				MARKETING_VERSION = 1.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.panjas.senor-particle";
 				PRODUCT_MODULE_NAME = senor_particle;
 				PRODUCT_NAME = "Senor Particle";
@@ -349,8 +425,49 @@
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		42D000092F90000100A00001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 8J2G689FCZ;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.panjas.senor-particle.tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Senor Particle.app/Contents/MacOS/Senor Particle";
+			};
+			name = Debug;
+		};
+		42D0000A2F90000100A00001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 8J2G689FCZ;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.panjas.senor-particle.tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Senor Particle.app/Contents/MacOS/Senor Particle";
 			};
 			name = Release;
 		};
@@ -375,6 +492,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		42D0000B2F90000100A00001 /* Build configuration list for PBXNativeTarget "SenorParticleTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				42D000092F90000100A00001 /* Debug */,
+				42D0000A2F90000100A00001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -383,7 +509,7 @@
 			repositoryURL = "https://github.com/heikopanjas/aranet-kit";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 3.5.2;
+				minimumVersion = 4.0.0;
 			};
 		};
 		42C0A0022F90000100A00001 /* XCRemoteSwiftPackageReference "Sparkle" */ = {

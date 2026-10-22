@@ -2,161 +2,154 @@ import AppKit
 import AranetKit
 import Sparkle
 
-class MenuManager: NSObject, NSMenuDelegate {
-    let menu: NSMenu
+/// Builds the status menu: one row per device above the fixed Rescan, Settings, About, and Quit items.
+///
+/// Device rows exist only while the menu is open. Every change notification causes at most one refresh, which updates
+/// the rows in place when the device list is unchanged and rebuilds them otherwise.
+final class MenuManager: NSObject {
+    private struct DeviceMenuEntry {
+        let item: NSMenuItem
+        let view: SensorDeviceView
+    }
+
+    private static let deviceViewSize = NSSize(width: 280, height: 100)
+
+    private let menu: NSMenu
     private weak var sensorManager: SensorManager?
+    private let preferences: PreferencesStore
     private let updaterController: SPUStandardUpdaterController
+    private var fixedItemCount = 0
     private var isOpen = false
     private var settingsWindowController: SettingsWindowController?
     private var rescanItem: NSMenuItem?
-    private var deviceEntries: [UUID: (NSMenuItem, SensorDeviceView)] = [:]
+    private var deviceEntries: [UUID: DeviceMenuEntry] = [:]
     private var deviceOrder: [UUID] = []
+    private var shownScanError: String?
 
-    init(menu: NSMenu, sensorManager: SensorManager, updaterController: SPUStandardUpdaterController) {
+    init(menu: NSMenu, sensorManager: SensorManager, preferences: PreferencesStore, updaterController: SPUStandardUpdaterController) {
         self.menu = menu
         self.sensorManager = sensorManager
+        self.preferences = preferences
         self.updaterController = updaterController
         super.init()
 
         self.menu.delegate = self
-        self.menu.addItem(NSMenuItem.separator())
+        self.menu.addItem(.separator())
 
-        let rescan = NSMenuItem(title: "Rescan", action: #selector(rescan), keyEquivalent: "r")
-        rescan.target = self
-        self.menu.addItem(rescan)
-        self.rescanItem = rescan
+        let rescanItem = NSMenuItem(title: "Rescan", action: #selector(self.rescan), keyEquivalent: "r")
+        rescanItem.target = self
+        self.menu.addItem(rescanItem)
+        self.rescanItem = rescanItem
 
-        self.menu.addItem(NSMenuItem.separator())
+        self.menu.addItem(.separator())
 
-        let settingsItem = NSMenuItem(
-            title: "Settings\u{2026}",
-            action: #selector(openSettings),
-            keyEquivalent: ","
-        )
+        let settingsItem = NSMenuItem(title: "Settings\u{2026}", action: #selector(self.openSettings), keyEquivalent: ",")
         settingsItem.target = self
         self.menu.addItem(settingsItem)
 
-        let aboutItem = NSMenuItem(title: "About \(Bundle.main.displayName)", action: #selector(openAbout), keyEquivalent: "")
+        let aboutItem = NSMenuItem(title: "About \(Bundle.main.displayName)", action: #selector(self.openAbout), keyEquivalent: "")
         aboutItem.target = self
         self.menu.addItem(aboutItem)
 
-        self.menu.addItem(NSMenuItem.separator())
+        self.menu.addItem(.separator())
 
         self.menu.addItem(NSMenuItem(title: "Quit \(Bundle.main.displayName)", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        self.fixedItemCount = self.menu.items.count
 
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleReadingDidUpdate),
-            name: .aranetReadingDidUpdate,
-            object: nil
-        )
+        let center = NotificationCenter.default
+        center.addObserver(self, selector: #selector(self.handleContentDidChange), name: .sensorDevicesDidChange, object: sensorManager)
+        center.addObserver(self, selector: #selector(self.handleContentDidChange), name: .aranetScanStateDidChange, object: sensorManager)
+        center.addObserver(self, selector: #selector(self.handleContentDidChange), name: .preferencesDidChange, object: preferences)
     }
 
-    deinit {
-        NotificationCenter.default.removeObserver(self)
-    }
+    // MARK: - Refresh
 
-    func refreshIfNeeded() -> Void {
-        guard self.isOpen == true, self.sensorManager != nil else { return }
-        self.refreshIfNeededOnMainThread()
-    }
-
-    @objc private func handleReadingDidUpdate() -> Void {
+    @objc private func handleContentDidChange() -> Void {
         MenuTrackingRefresh.perform { [weak self] in
-            self?.refreshIfNeededOnMainThread()
+            self?.refresh()
         }
     }
 
-    private func refreshIfNeededOnMainThread() -> Void {
-        guard self.isOpen == true, let sensorManager = self.sensorManager else { return }
+    private func refresh() -> Void {
+        guard self.isOpen == true else { return }
+        guard let sensorManager = self.sensorManager else { return }
 
-        if sensorManager.isScanning == true || sensorManager.sortedDevices.isEmpty == true {
-            self.refreshDeviceItems()
-            return
-        }
-
-        let order = sensorManager.sortedDevices.map { $0.device.id }
-        if order == self.deviceOrder {
-            self.updateDeviceViewsInPlace()
+        if self.canUpdateInPlace(sensorManager) == true {
+            self.updateDeviceViewsInPlace(sensorManager)
         }
         else {
-            self.refreshDeviceItems()
+            self.rebuildDeviceItems()
         }
     }
 
-    // MARK: - NSMenuDelegate
-
-    func menuWillOpen(_ menu: NSMenu) -> Void {
-        self.isOpen = true
-        self.refreshDeviceItems()
+    /// Whether the shown rows still match the device list, so they can be reconfigured instead of rebuilt.
+    private func canUpdateInPlace(_ sensorManager: SensorManager) -> Bool {
+        guard sensorManager.isScanning == false else { return false }
+        guard sensorManager.scanError == self.shownScanError else { return false }
+        guard self.deviceOrder.isEmpty == false else { return false }
+        return sensorManager.sortedDevices.map(\.device.id) == self.deviceOrder
     }
 
-    func menuDidClose(_ menu: NSMenu) -> Void {
-        self.isOpen = false
-        self.clearDeviceItems()
-    }
-
-    // MARK: - Private
-
-    private func refreshDeviceItems() -> Void {
+    private func rebuildDeviceItems() -> Void {
         self.clearDeviceItems()
 
         guard let sensorManager = self.sensorManager else { return }
 
         self.rescanItem?.isEnabled = sensorManager.isScanning == false
+        self.shownScanError = sensorManager.scanError
 
         if sensorManager.isScanning == true {
-            let item = NSMenuItem(title: "Scanning for devices...", action: nil, keyEquivalent: "")
-            item.isEnabled = false
-            self.menu.insertItem(item, at: 0)
-            return
-        }
-
-        let devices = sensorManager.sortedDevices
-
-        if devices.isEmpty == true {
-            let item = NSMenuItem(title: "No devices found", action: nil, keyEquivalent: "")
-            item.isEnabled = false
-            self.menu.insertItem(item, at: 0)
+            self.insertInfoItem("Scanning for devices\u{2026}", at: 0)
             return
         }
 
         var insertIndex = 0
-        for (i, device) in devices.enumerated() {
-            if i > 0 {
+        if let scanError = sensorManager.scanError {
+            self.insertInfoItem("\(scanError). Retrying automatically.", at: insertIndex)
+            insertIndex += 1
+        }
+
+        let devices = sensorManager.sortedDevices
+        guard devices.isEmpty == false else {
+            if insertIndex == 0 {
+                self.insertInfoItem("No devices found", at: insertIndex)
+            }
+            return
+        }
+
+        for monitored in devices {
+            if insertIndex > 0 {
                 self.menu.insertItem(.separator(), at: insertIndex)
                 insertIndex += 1
             }
+
+            let view = SensorDeviceView(frame: NSRect(origin: .zero, size: Self.deviceViewSize))
+            self.configure(view, with: monitored)
             let item = NSMenuItem()
-            let view = SensorDeviceView(frame: NSRect(x: 0, y: 0, width: 280, height: 100))
-            view.configure(
-                device: device.device,
-                reading: device.reading,
-                lastUpdated: device.lastUpdated,
-                updateSequence: device.updateSequence
-            )
             item.view = view
             self.menu.insertItem(item, at: insertIndex)
-            self.deviceEntries[device.device.id] = (item, view)
-            self.deviceOrder.append(device.device.id)
+            self.deviceEntries[monitored.device.id] = DeviceMenuEntry(item: item, view: view)
+            self.deviceOrder.append(monitored.device.id)
             insertIndex += 1
         }
     }
 
-    private func updateDeviceViewsInPlace() -> Void {
-        guard let sensorManager = self.sensorManager else { return }
-
-        for device in sensorManager.sortedDevices {
-            guard let (item, view) = self.deviceEntries[device.device.id] else { continue }
-            view.configure(
-                device: device.device,
-                reading: device.reading,
-                lastUpdated: device.lastUpdated,
-                updateSequence: device.updateSequence
-            )
-            self.reattachMenuItemView(item, view: view)
+    private func updateDeviceViewsInPlace(_ sensorManager: SensorManager) -> Void {
+        for monitored in sensorManager.sortedDevices {
+            guard let entry = self.deviceEntries[monitored.device.id] else { continue }
+            self.configure(entry.view, with: monitored)
+            self.reattachMenuItemView(entry.item, view: entry.view)
         }
         self.menu.update()
+    }
+
+    private func configure(_ view: SensorDeviceView, with monitored: MonitoredDevice) -> Void {
+        view.configure(
+            monitored,
+            displayName: self.preferences.displayName(for: monitored),
+            unitSystem: self.preferences.displayUnitSystem,
+            degradedCycles: self.preferences.degradedCycles
+        )
     }
 
     /// Reassigns the custom view so AppKit repaints menu item content during menu tracking.
@@ -164,6 +157,23 @@ class MenuManager: NSObject, NSMenuDelegate {
         item.view = nil
         item.view = view
     }
+
+    private func insertInfoItem(_ title: String, at index: Int) -> Void {
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        item.isEnabled = false
+        self.menu.insertItem(item, at: index)
+    }
+
+    /// Removes everything above the fixed items, whose count is recorded when the menu is built.
+    private func clearDeviceItems() -> Void {
+        while self.menu.items.count > self.fixedItemCount {
+            self.menu.removeItem(at: 0)
+        }
+        self.deviceEntries.removeAll()
+        self.deviceOrder.removeAll()
+    }
+
+    // MARK: - Actions
 
     @objc private func rescan() -> Void {
         self.sensorManager?.rescan()
@@ -180,15 +190,24 @@ class MenuManager: NSObject, NSMenuDelegate {
     /// Lazily creates the single shared Settings window so every menu entry reuses the same tab state.
     private func resolvedSettingsWindowController() -> SettingsWindowController? {
         if self.settingsWindowController == nil, let sensorManager = self.sensorManager {
-            self.settingsWindowController = SettingsWindowController(sensorManager: sensorManager, updaterController: self.updaterController)
+            self.settingsWindowController = SettingsWindowController(
+                sensorManager: sensorManager,
+                preferences: self.preferences,
+                updaterController: self.updaterController
+            )
         }
         return self.settingsWindowController
     }
+}
 
-    private func clearDeviceItems() -> Void {
-        let fixedItemCount = 7
-        while self.menu.items.count > fixedItemCount { self.menu.removeItem(at: 0) }
-        self.deviceEntries.removeAll()
-        self.deviceOrder.removeAll()
+extension MenuManager: NSMenuDelegate {
+    func menuWillOpen(_ menu: NSMenu) -> Void {
+        self.isOpen = true
+        self.rebuildDeviceItems()
+    }
+
+    func menuDidClose(_ menu: NSMenu) -> Void {
+        self.isOpen = false
+        self.clearDeviceItems()
     }
 }

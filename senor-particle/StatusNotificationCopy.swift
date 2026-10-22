@@ -1,27 +1,29 @@
 import AranetKit
 import Foundation
+import os
 
-enum StatusNotificationCopy {
+/// Carrot Weather-inspired notification text for status color transitions.
+///
+/// The copy is data-first (metric plus plain-language severity), device-type aware, and direction-aware. Every
+/// category, transition, and personality combination must have an entry; a test enforces that.
+nonisolated enum StatusNotificationCopy {
+    /// The notification for a status change of the device titled `title`, or nil when the change does not warrant one.
     static func content(
         for reading: AranetReading,
-        deviceId: UUID,
-        from previous: AranetStatusColor,
-        to current: AranetStatusColor,
-        personality: NotificationPersonality = NotificationPersonalityPreferences.current
-    ) -> (title: String, body: String)? {
-        guard let transition = StatusTransitionKind(from: previous, to: current) else { return nil }
+        title: String,
+        transition: StatusTransition,
+        personality: NotificationPersonality,
+        unitSystem: DisplayUnitSystem
+    ) -> StatusNotificationContent? {
+        guard let kind = StatusTransitionKind(from: transition.from, to: transition.to) else { return nil }
 
-        let title = DeviceNamePreferences.name(for: deviceId) ?? reading.name
-        let metric = metricClause(for: reading)
-        guard
-            let tail = copy(
-                for: deviceCategory(for: reading),
-                transition: transition,
-                personality: personality
-            )
-        else { return nil }
+        let category = Self.deviceCategory(for: reading)
+        guard let tail = Self.copy(for: category, transition: kind, personality: personality) else {
+            Logger.notifications.error("Missing notification copy for a status transition")
+            return nil
+        }
 
-        return (title, "\(metric) \(tail)")
+        return StatusNotificationContent(title: title, body: "\(Self.metricClause(for: reading, unitSystem: unitSystem)) \(tail)")
     }
 
     // MARK: - Types
@@ -39,13 +41,44 @@ enum StatusNotificationCopy {
         case improvingToYellow
         case improvingToGreen
 
+        /// Lists every color pair, so a new `AranetStatusColor` case fails to compile until it is classified.
         init?(from previous: AranetStatusColor, to current: AranetStatusColor) {
-            switch (previous, current) {
-                case (.green, .yellow): self = .worseningToYellow
-                case (.yellow, .red), (.green, .red): self = .worseningToRed
-                case (.red, .yellow): self = .improvingToYellow
-                case (.yellow, .green), (.red, .green): self = .improvingToGreen
-                default: return nil
+            switch previous {
+                case .green:
+                    switch current {
+                        case .yellow:
+                            self = .worseningToYellow
+                        case .red:
+                            self = .worseningToRed
+                        case .green:
+                            return nil
+                        case .error:
+                            return nil
+                    }
+                case .yellow:
+                    switch current {
+                        case .red:
+                            self = .worseningToRed
+                        case .green:
+                            self = .improvingToGreen
+                        case .yellow:
+                            return nil
+                        case .error:
+                            return nil
+                    }
+                case .red:
+                    switch current {
+                        case .yellow:
+                            self = .improvingToYellow
+                        case .green:
+                            self = .improvingToGreen
+                        case .red:
+                            return nil
+                        case .error:
+                            return nil
+                    }
+                case .error:
+                    return nil
             }
         }
     }
@@ -54,25 +87,41 @@ enum StatusNotificationCopy {
 
     private static func deviceCategory(for reading: AranetReading) -> DeviceCategory {
         switch reading.deviceType {
-            case .aranet4: return .co2
-            case .aranetRadiation: return .radiation
-            case .aranetRadon: return .radon
-            default:
-                if reading.co2 != nil { return .co2 }
-                if reading.radiationRate != nil { return .radiation }
-                if reading.radonConcentration != nil { return .radon }
-                return .generic
+            case .aranet4:
+                return .co2
+            case .aranetRadiation:
+                return .radiation
+            case .aranetRadon:
+                return .radon
+            case .aranet2:
+                return Self.category(fromMeasurementsOf: reading)
+            case .unknown:
+                return Self.category(fromMeasurementsOf: reading)
         }
     }
 
-    private static func metricClause(for reading: AranetReading) -> String {
-        if let value = StatusBarDisplayMetric.co2.valueString(for: reading) {
+    /// Classifies a device type without its own copy by the measurements its reading carries.
+    private static func category(fromMeasurementsOf reading: AranetReading) -> DeviceCategory {
+        if reading.co2 != nil {
+            return .co2
+        }
+        if reading.radiationRate != nil {
+            return .radiation
+        }
+        if reading.radonConcentration != nil {
+            return .radon
+        }
+        return .generic
+    }
+
+    private static func metricClause(for reading: AranetReading, unitSystem: DisplayUnitSystem) -> String {
+        if let value = StatusBarDisplayMetric.co2.valueString(for: reading, unitSystem: unitSystem) {
             return "CO\u{2082} is \(value)."
         }
-        if let value = StatusBarDisplayMetric.radiationRate.valueString(for: reading) {
+        if let value = StatusBarDisplayMetric.radiationRate.valueString(for: reading, unitSystem: unitSystem) {
             return "Radiation is \(value)."
         }
-        if let value = StatusBarDisplayMetric.radonConcentration.valueString(for: reading) {
+        if let value = StatusBarDisplayMetric.radonConcentration.valueString(for: reading, unitSystem: unitSystem) {
             return "Radon is \(value)."
         }
         return "Sensor reading updated."
@@ -85,14 +134,14 @@ enum StatusNotificationCopy {
         transition: StatusTransitionKind,
         personality: NotificationPersonality
     ) -> String? {
-        copyTable[category]?[transition]?[personality]
+        return Self.copyTable[category]?[transition]?[personality]
     }
 
     private static let copyTable: [DeviceCategory: [StatusTransitionKind: [NotificationPersonality: String]]] = [
-        .co2: co2Copy,
-        .radiation: radiationCopy,
-        .radon: radonCopy,
-        .generic: genericCopy
+        .co2: Self.co2Copy,
+        .radiation: Self.radiationCopy,
+        .radon: Self.radonCopy,
+        .generic: Self.genericCopy
     ]
 
     private static let co2Copy: [StatusTransitionKind: [NotificationPersonality: String]] = [

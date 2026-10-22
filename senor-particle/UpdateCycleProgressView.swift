@@ -1,27 +1,29 @@
 import AranetKit
 import Cocoa
 
-class UpdateCycleProgressView: NSView {
-    private let trackView = NSView()
-    private let fillView = NSView()
-
-    private var cycleAnchor: Date?
-    private var cycleStartAgo: TimeInterval = 0
-    private var interval: TimeInterval = 300
-    private var updateSequence: UInt = 0
-    private var timer: Timer?
-
-    private static let defaultInterval: TimeInterval = 300
+/// A thin bar under each device in the status menu showing how far the device is into its update interval.
+///
+/// The fill fades from opaque to faded light green during each interval and turns dark red once the device has missed
+/// the configured number of updates. `UpdateCycleCalculator` holds the arithmetic; a new `updateSequence` re-anchors it.
+final class UpdateCycleProgressView: NSView {
+    private static let refreshInterval: TimeInterval = 1
     private static let cornerRadius: CGFloat = 1
-
     private static let lightGreen = NSColor(red: 0.20, green: 0.78, blue: 0.28, alpha: 1.0)
     private static let lightGreenFadedAlpha: CGFloat = 0.37
     private static let darkRed = NSColor(red: 0.55, green: 0.10, blue: 0.10, alpha: 1.0)
 
+    private let trackView = NSView()
+    private let fillView = NSView()
+    private let now: () -> Date
+    private var calculator: UpdateCycleCalculator?
+    private var updateSequence: UInt = 0
+    private var timer: Timer?
+
     override var isFlipped: Bool { return true }
 
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
+    init(now: @escaping () -> Date = { Date() }) {
+        self.now = now
+        super.init(frame: .zero)
         self.setupSubviews()
     }
 
@@ -31,14 +33,25 @@ class UpdateCycleProgressView: NSView {
         self.timer?.invalidate()
     }
 
-    func configure(lastUpdated: Date, reading: AranetReading, updateSequence: UInt) -> Void {
-        let newCycle = updateSequence != self.updateSequence
+    /// Shows the cycle of `reading`, keeping the current anchor unless `updateSequence` announces a new reading.
+    func configure(lastUpdated: Date, reading: AranetReading, updateSequence: UInt, degradedCycles: Int) -> Void {
+        let isNewCycle = updateSequence != self.updateSequence
         self.updateSequence = updateSequence
-        self.interval = Self.interval(for: reading)
 
-        if newCycle == true {
-            self.cycleAnchor = lastUpdated
-            self.cycleStartAgo = TimeInterval(reading.ago ?? 0)
+        let current = UpdateCycleCalculator(anchor: lastUpdated, reading: reading, degradedCycles: degradedCycles)
+        if isNewCycle == true {
+            self.calculator = current
+        }
+        else if let previous = self.calculator {
+            self.calculator = UpdateCycleCalculator(
+                anchor: previous.anchor,
+                startAgo: previous.startAgo,
+                interval: current.interval,
+                degradedCycles: degradedCycles
+            )
+        }
+        else {
+            self.calculator = current
         }
 
         self.isHidden = false
@@ -47,8 +60,7 @@ class UpdateCycleProgressView: NSView {
     }
 
     func clear() -> Void {
-        self.cycleAnchor = nil
-        self.cycleStartAgo = 0
+        self.calculator = nil
         self.updateSequence = 0
         self.timer?.invalidate()
         self.timer = nil
@@ -58,7 +70,7 @@ class UpdateCycleProgressView: NSView {
 
     override func setFrameSize(_ newSize: NSSize) -> Void {
         super.setFrameSize(newSize)
-        self.layoutBar(progress: self.currentProgress())
+        self.layoutBar(fillFraction: self.currentState()?.fillFraction ?? 0)
     }
 
     // MARK: - Private
@@ -78,73 +90,45 @@ class UpdateCycleProgressView: NSView {
         self.isHidden = true
     }
 
+    /// Starts the once-per-second refresh unless it already runs; `clear()` stops it.
     private func startTimer() -> Void {
-        self.timer?.invalidate()
-        let newTimer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.refresh()
-            }
+        guard self.timer == nil else { return }
+        self.timer = MainRunLoopTimer.scheduleRepeating(every: Self.refreshInterval) { [weak self] in
+            self?.refresh()
         }
-        RunLoop.main.add(newTimer, forMode: .common)
-        self.timer = newTimer
+    }
+
+    private func currentState() -> UpdateCycleCalculator.State? {
+        return self.calculator?.state(at: self.now())
     }
 
     private func refresh() -> Void {
-        guard let cycleAnchor = self.cycleAnchor else { return }
+        guard let state = self.currentState() else { return }
 
-        let elapsed = self.cycleStartAgo + Date().timeIntervalSince(cycleAnchor)
-
-        if elapsed >= self.interval * Double(self.degradedCycleThreshold) {
-            self.fillView.layer?.backgroundColor = Self.darkRed.cgColor
-            self.layoutBar(progress: 1)
+        switch state {
+            case .degraded:
+                self.fillView.layer?.backgroundColor = Self.darkRed.cgColor
+            case .progressing(let fraction):
+                self.fillView.layer?.backgroundColor = Self.normalColor(fillFraction: fraction).cgColor
         }
-        else {
-            let progress = self.cycleProgress(elapsed: elapsed)
-            self.fillView.layer?.backgroundColor = Self.normalColor(progress: progress).cgColor
-            self.layoutBar(progress: progress)
-        }
+        self.layoutBar(fillFraction: state.fillFraction)
 
         self.trackView.needsDisplay = true
         self.fillView.needsDisplay = true
     }
 
-    /// Maps total elapsed time into a repeating 0...1 progress within each interval.
-    private func cycleProgress(elapsed: TimeInterval) -> Double {
-        let position = elapsed.truncatingRemainder(dividingBy: self.interval)
-        return position / self.interval
-    }
-
-    private func currentProgress() -> Double {
-        guard let cycleAnchor = self.cycleAnchor else { return 0 }
-
-        let elapsed = self.cycleStartAgo + Date().timeIntervalSince(cycleAnchor)
-        if elapsed >= self.interval * Double(self.degradedCycleThreshold) { return 1 }
-        return self.cycleProgress(elapsed: elapsed)
-    }
-
-    private func layoutBar(progress: Double) -> Void {
-        guard self.frame.width > 0, self.frame.height > 0 else { return }
+    private func layoutBar(fillFraction: Double) -> Void {
+        guard self.frame.width > 0 else { return }
+        guard self.frame.height > 0 else { return }
 
         self.trackView.frame = self.bounds
-        self.fillView.frame = NSRect(x: 0, y: 0, width: self.bounds.width * progress, height: self.bounds.height)
+        self.fillView.frame = NSRect(x: 0, y: 0, width: self.bounds.width * fillFraction, height: self.bounds.height)
     }
 
-    private static func interval(for reading: AranetReading) -> TimeInterval {
-        TimeInterval(reading.interval.map { max($0, 1) } ?? UInt16(defaultInterval))
-    }
-
-    private var degradedCycleThreshold: Int {
-        return DegradedSituationPreferences.cycles
-    }
-
-    private static func normalColor(progress: Double) -> NSColor {
-        let t = min(max(progress, 0), 1)
-        let alpha = Self.lightGreen.alphaComponent + (Self.lightGreenFadedAlpha - Self.lightGreen.alphaComponent) * t
-        return NSColor(
-            red: Self.lightGreen.redComponent,
-            green: Self.lightGreen.greenComponent,
-            blue: Self.lightGreen.blueComponent,
-            alpha: alpha
-        )
+    /// Light green that fades from opaque at the start of an interval to `lightGreenFadedAlpha` at its end.
+    private static func normalColor(fillFraction: Double) -> NSColor {
+        let fraction = min(max(fillFraction, 0), 1)
+        let alpha = Self.lightGreen.alphaComponent + (Self.lightGreenFadedAlpha - Self.lightGreen.alphaComponent) * fraction
+        return Self.lightGreen.withAlphaComponent(alpha)
     }
 }

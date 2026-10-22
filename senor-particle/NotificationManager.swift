@@ -1,83 +1,91 @@
 import AranetKit
 import Foundation
 import UserNotifications
+import os
 
-class NotificationManager {
+/// Posts a user notification when a device with notifications enabled changes its status color.
+///
+/// Permission is requested when the user enables notifications for a device, and again before posting, which is a
+/// no-op once the user has decided.
+final class NotificationManager {
     private weak var sensorManager: SensorManager?
-    private var previousStatuses: [UUID: AranetStatusColor] = [:]
+    private let preferences: PreferencesStore
+    private var tracker = StatusTransitionTracker()
 
-    init(sensorManager: SensorManager) {
+    init(sensorManager: SensorManager, preferences: PreferencesStore = .shared, notificationCenter: NotificationCenter = .default) {
         self.sensorManager = sensorManager
+        self.preferences = preferences
 
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, error in
-            if let error { NSLog("[NotificationManager] Authorization error: %@", error.localizedDescription) }
-        }
-
-        NotificationCenter.default.addObserver(
+        notificationCenter.addObserver(
             self,
-            selector: #selector(self.handleReadingDidUpdate),
-            name: .aranetReadingDidUpdate,
-            object: nil
+            selector: #selector(self.handleDevicesDidChange(_:)),
+            name: .sensorDevicesDidChange,
+            object: sensorManager
         )
     }
 
-    deinit {
-        NotificationCenter.default.removeObserver(self)
+    /// Asks for permission to post notifications; macOS prompts only while the user has not decided yet.
+    @concurrent static func requestAuthorization() async -> Void {
+        do {
+            _ = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
+        }
+        catch {
+            let message = error.localizedDescription
+            Logger.notifications.error("Notification authorization failed: \(message, privacy: .public)")
+        }
+    }
+
+    /// Whether the user turned notifications off for the app in System Settings.
+    @concurrent static func isAuthorizationDenied() async -> Bool {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        return settings.authorizationStatus == .denied
     }
 
     // MARK: - Private
 
-    @objc private func handleReadingDidUpdate() -> Void {
-        guard let devices = self.sensorManager?.sortedDevices else { return }
+    @objc private func handleDevicesDidChange(_ notification: Notification) -> Void {
+        guard let deviceId = notification.userInfo?[SensorManager.deviceIdUserInfoKey] as? UUID else { return }
+        guard let monitored = self.sensorManager?.devices[deviceId] else { return }
 
-        for device in devices {
-            let id = device.device.id
+        let transition = self.tracker.evaluate(
+            deviceId: deviceId,
+            status: monitored.reading?.status,
+            enabled: self.preferences.notificationsEnabled(for: deviceId)
+        )
+        guard let transition else { return }
+        guard let reading = monitored.reading else { return }
 
-            guard NotificationPreferences.isEnabled(for: id),
-                let reading = device.reading,
-                let newStatus = reading.status
-            else {
-                // Clear stored status so re-enabling doesn't fire a spurious transition
-                self.previousStatuses.removeValue(forKey: id)
-                continue
-            }
+        let content = StatusNotificationCopy.content(
+            for: reading,
+            title: self.preferences.displayName(for: monitored),
+            transition: transition,
+            personality: self.preferences.notificationPersonality,
+            unitSystem: self.preferences.displayUnitSystem
+        )
+        guard let content else { return }
 
-            if let previous = self.previousStatuses[id], previous != newStatus {
-                self.deliver(reading: reading, deviceId: id, from: previous, to: newStatus)
-            }
-
-            self.previousStatuses[id] = newStatus
+        let title = content.title
+        let body = content.body
+        Task {
+            await Self.post(title: title, body: body)
         }
     }
 
-    private func deliver(
-        reading: AranetReading,
-        deviceId: UUID,
-        from previous: AranetStatusColor,
-        to current: AranetStatusColor
-    ) -> Void {
-        guard
-            let notification = StatusNotificationCopy.content(
-                for: reading,
-                deviceId: deviceId,
-                from: previous,
-                to: current
-            )
-        else { return }
+    @concurrent private static func post(title: String, body: String) async -> Void {
+        await Self.requestAuthorization()
 
         let content = UNMutableNotificationContent()
-        content.title = notification.title
-        content.body = notification.body
+        content.title = title
+        content.body = body
         content.sound = .default
+        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
 
-        let request = UNNotificationRequest(
-            identifier: UUID().uuidString,
-            content: content,
-            trigger: nil
-        )
-
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error { NSLog("[NotificationManager] Failed to post notification: %@", error.localizedDescription) }
+        do {
+            try await UNUserNotificationCenter.current().add(request)
+        }
+        catch {
+            let message = error.localizedDescription
+            Logger.notifications.error("Posting a notification failed: \(message, privacy: .public)")
         }
     }
 }
