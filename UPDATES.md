@@ -4,6 +4,17 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.3.0, code review fixes on aranetkit 4.0.0 14:50)
+
+- bumped aranetkit to 4.0.0; sensormanager takes a sensorclient, consumes one monitor stream per device, and posts sensordevicesdidchange for the menu, status item, devices tab, and notifications
+- reconnects back off 5 to 80 seconds, a reading resets the count, and a device that gives up shows a failed connection state until rescan; failed scans show their reason and retry after 30 seconds
+- moved all preferences into an injected preferencesstore that posts preferencesdidchange only on real changes; storage keys are unchanged and the legacy single status bar metric migrates
+- extracted pure models (status bar selection, transition tracker, notification content, update cycle calculator, battery level) and added the senorparticletests swift testing target
+- notification permission is requested when a device's notifications are enabled, not at launch
+- ci now runs swift-format lint and the unit tests with and without thread sanitizer; warnings are errors
+- rationale: implements phases 0 to 5 of code_review.md; a10, c15, and t4 stay deferred because they need visual verification
+- version: 1.2.0 to 1.3.0, minor, because the connection state and scan error ui are new behavior
+
 ### 2026-10-22 (v1.2.0, code review re-checked against aranetkit 4.0.0 13:55)
 
 - re-checked every aranetkit-dependent finding in code_review.md against aranetkit 4.0.0 (released today): c3 drops from high to medium because concurrent scans no longer hang inside the library, k5 now rests on a documented main-actor delivery contract, a3 adopts aranetkit's own sensorclient protocol instead of an app-local one, c4 and c5 get real error messages from localizederror

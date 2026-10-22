@@ -8,6 +8,30 @@
 
 Line numbers refer to the reviewed revision. Finding IDs are stable and are referenced from the phases in Part 2.
 
+## Fix status (v1.3.0, branch `feature/code-review`)
+
+Phases 0 to 5 and the C4/A11 slice of Phase 6 are implemented. CI builds, lints, and runs the unit tests with and without Thread Sanitizer. A hardware run with real sensors is still required before release.
+
+**Decisions taken** (Part 3): C10 shows the available pinned values and falls back to the default values; C11 requests permission lazily; D2 keeps 147 columns; K8 adopts `os.Logger` now; C14 keeps the tables with a coverage test; D7 bumps AranetKit to 4.0.0 first.
+
+| Area | Fixed | Not fixed |
+| --- | --- | --- |
+| Correctness | C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, C14, C16, C17, C18, C19, C20 | C15 (Settings layout, see A10) |
+| Concurrency | K1, K2, K3, K4, K5, K7, K8 | K6 (informational, no action) |
+| Architecture | A1, A2, A3, A4, A5, A6, A7, A8, A9, A11, A13, A14 | A10 (stack view layout), A12 (localization, informational) |
+| Conventions | S1 to S10, S12 to S14, S16 | S11 and S15 (no action) |
+| Testing | T1, T2, T3 | T4 (UI tests) |
+| Tooling and docs | D1, D2, D3, D4, D5, D6, D7 | none |
+
+**Deviations from the plan:**
+
+- C8 and K5: `SensorManager` iterates AranetKit's `monitor(from:)` streams instead of observing `aranetReadingDidUpdate`. The compiler then checks reading isolation, and nothing depends on notification delivery. Every other consumer observes `sensorDevicesDidChange`.
+- C5: a failed scan shows its reason in the status menu and retries every 30 seconds. There is no separate Bluetooth-off banner.
+- T2: tests use `ReadingFixtures` instead of an `AranetReading` extension, record notifications synchronously instead of with `confirmation()`, and use no tags. Battery tests target the extracted `BatteryLevel`.
+- D6: the version is 1.3.0, because the connection state and scan error UI are new behavior and v1.2.0 is already tagged.
+
+**Deferred:** A10 and C15 change the Settings layout and T4 adds UI tests. Both need visual verification on a Mac, so they stay in Phase 6.
+
 ---
 
 ## Executive summary
