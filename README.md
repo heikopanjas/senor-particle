@@ -69,16 +69,22 @@ senor-particle/
 ├── MenuManager.swift        # Programmatic NSMenu lifecycle (populate on open, clear on close)
 ├── SensorDeviceView.swift   # Custom NSView per device (icon, readings, status badge)
 ├── BatteryView.swift        # Battery icon and percentage display
+├── PreferencesStore.swift   # Every user preference, injectable for tests
+├── NotificationManager.swift # Status change notifications
+├── *ViewController.swift    # Settings tabs (General, Devices, Advanced, About)
 ├── Base.lproj/
 │   └── Main.storyboard      # Minimal storyboard (app delegate wiring only)
 └── Assets.xcassets/         # App icons and accent color
+SenorParticleTests/          # Swift Testing unit tests, fakes, and fixtures
 ```
 
 **AppDelegate** creates the `NSStatusItem`, starts a Bluetooth scan via `SensorManager`, and begins monitoring discovered devices. Status bar text updates on each new reading.
 
 **AppDelegate** also owns the app's single `SPUStandardUpdaterController` and passes it to the Settings window. The About tab reads and writes Sparkle's persisted updater preferences directly.
 
-**SensorManager** wraps `AranetClient` from AranetKit. It scans for devices, then spawns a monitoring task per device using AranetKit's `monitor()` AsyncStream. Disconnections are handled with exponential backoff retry (up to 5 attempts).
+**SensorManager** talks to sensors through AranetKit's `SensorClient` protocol. It scans for devices, then runs a monitoring task per device over AranetKit's `monitor(from:)` stream. A dropped connection is retried with exponential backoff, from 5 to 80 seconds. A reading resets the count, and after 5 failed attempts the device shows a stopped state until the next Rescan. A failed scan shows its reason in the menu and retries after 30 seconds. Every change is announced through `sensorDevicesDidChange`.
+
+**PreferencesStore** holds every user preference and announces changes through `preferencesDidChange`.
 
 **MenuManager** acts as `NSMenuDelegate`. On `menuWillOpen`, it builds a menu item per device with a custom `SensorDeviceView`. On `menuDidClose`, it clears dynamic items. Live updates refresh the menu while open.
 
@@ -96,9 +102,21 @@ xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -configurati
 
 Use `build.sh` for a Developer ID archive and export. It writes archives, exported apps, and optional notarization zips below `.build/Local` while reusing `.build/SourcePackages`.
 
+### Testing
+
+```bash
+# Unit tests (Swift Testing, hosted by the app)
+xcodebuild test -project senor-particle.xcodeproj -scheme senor-particle -destination "platform=macOS,arch=arm64" -derivedDataPath .build/DerivedData/CLI -clonedSourcePackagesDirPath .build/SourcePackages
+
+# Lint exactly as CI does
+xcrun swift-format lint --strict --recursive senor-particle SenorParticleTests
+```
+
+The unit tests drive `SensorManager` through a fake sensor client, so they need no Bluetooth hardware. Check real sensors by running the app before a release.
+
 ### GitHub Actions
 
-`.github/workflows/build.yml` creates signed ARM64 Developer ID builds on pushes and pull requests for `develop` and `feature/**`. `.github/workflows/release.yml` validates pull requests targeting `main`, then runs again after a merge is pushed to `main` to notarize the app and publish a versioned GitHub release. Both workflows use `.build/DerivedData/CI`, `.build/SourcePackages`, and `.build/CI`, then upload a zip containing `Senor Particle.app`, `CHANGELOG.md`, and `BILL_OF_MATERIALS.md`.
+`.github/workflows/build.yml` creates signed ARM64 Developer ID builds on pushes and pull requests for `develop` and `feature/**`. `.github/workflows/release.yml` validates pull requests targeting `main`, then runs again after a merge is pushed to `main` to notarize the app and publish a versioned GitHub release. Both workflows also lint the sources and run the unit tests, once normally and once under Thread Sanitizer. Both workflows use `.build/DerivedData/CI`, `.build/SourcePackages`, and `.build/CI`, then upload a zip containing `Senor Particle.app`, `CHANGELOG.md`, and `BILL_OF_MATERIALS.md`.
 
 Release runs also create an app-only Sparkle archive, generate an EdDSA-signed appcast, and retain all update archives in the mutable `sparkle-updates` prerelease. After those archives are available, the workflow deploys the appcast to [GitHub Pages](https://heikopanjas.github.io/senor-particle/appcast.xml). Delta updates are intentionally disabled until multiple Sparkle-enabled production releases are available.
 

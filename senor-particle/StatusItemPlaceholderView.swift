@@ -1,11 +1,18 @@
 import Cocoa
 
+/// The status item before readings arrive: the scanning symbol with two radio-wave pulses expanding around it.
 final class StatusItemPlaceholderView: NSView {
     private static let width: CGFloat = 34
     private static let symbolPointSize: CGFloat = 18
     private static let pulseLineWidth: CGFloat = 2
     private static let animationInterval: TimeInterval = 1.0 / 30.0
     private static let cycleDuration: TimeInterval = 1.4
+    /// The pulse radius grows from `pulseStartRadius` by up to `pulseGrowth` points while fading from `pulseStartAlpha`.
+    private static let pulseStartRadius: CGFloat = 9
+    private static let pulseGrowth: CGFloat = 5
+    private static let pulseStartAlpha: CGFloat = 0.55
+    /// The second pulse runs half a cycle behind the first.
+    private static let pulsePhaseOffset = 0.5
 
     private var timer: Timer?
     private var animationStart = Date()
@@ -37,13 +44,9 @@ final class StatusItemPlaceholderView: NSView {
 
         guard self.timer == nil else { return }
 
-        let newTimer = Timer(timeInterval: Self.animationInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.needsDisplay = true
-            }
+        self.timer = MainRunLoopTimer.scheduleRepeating(every: Self.animationInterval) { [weak self] in
+            self?.needsDisplay = true
         }
-        RunLoop.main.add(newTimer, forMode: .common)
-        self.timer = newTimer
     }
 
     func stopAnimating() -> Void {
@@ -62,7 +65,7 @@ final class StatusItemPlaceholderView: NSView {
         self.drawPulse(center: center, progress: progress)
     }
 
-    @MainActor static func requiredWidth() -> CGFloat {
+    static func requiredWidth() -> CGFloat {
         return Self.width
     }
 
@@ -79,12 +82,12 @@ final class StatusItemPlaceholderView: NSView {
     }
 
     private func drawPulse(center: NSPoint, progress: Double) -> Void {
-        let phases = [progress, (progress + 0.5).truncatingRemainder(dividingBy: 1.0)]
+        let phases = [progress, (progress + Self.pulsePhaseOffset).truncatingRemainder(dividingBy: 1.0)]
 
         for phase in phases {
             let easedPhase = CGFloat(phase)
-            let radius = 9 + easedPhase * 5
-            let alpha = max(0, 0.55 * (1 - easedPhase))
+            let radius = Self.pulseStartRadius + easedPhase * Self.pulseGrowth
+            let alpha = max(0, Self.pulseStartAlpha * (1 - easedPhase))
             let rect = NSRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
             let path = NSBezierPath(ovalIn: rect)
 
@@ -95,7 +98,7 @@ final class StatusItemPlaceholderView: NSView {
     }
 
     private func layoutSymbol() -> Void {
-        let size = NSSize(width: Self.symbolPointSize, height: Self.symbolPointSize)
-        self.imageView.frame = NSRect(x: (self.bounds.width - size.width) / 2, y: (self.bounds.height - size.height) / 2, width: size.width, height: size.height)
+        let size = Self.symbolPointSize
+        self.imageView.frame = NSRect(x: (self.bounds.width - size) / 2, y: (self.bounds.height - size) / 2, width: size, height: size)
     }
 }

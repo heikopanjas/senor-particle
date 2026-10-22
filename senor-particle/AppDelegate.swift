@@ -2,197 +2,147 @@ import AranetKit
 import Cocoa
 import Sparkle
 
-@main class AppDelegate: NSObject, NSApplicationDelegate {
+/// Owns the status item and the long-lived managers, and keeps the status item in sync with the latest readings.
+@main
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private static let airLabel = "AIR"
+    private static let radiationLabel = "RAD"
+
+    private let preferences = PreferencesStore.shared
+    private let updaterController = SPUStandardUpdaterController(
+        startingUpdater: AppEnvironment.isRunningUnitTests == false,
+        updaterDelegate: nil,
+        userDriverDelegate: nil
+    )
+    private let statusItemDisplayView = StatusItemDisplayView()
+    private let statusItemPlaceholderView = StatusItemPlaceholderView()
     private var statusItem: NSStatusItem?
     private var sensorManager: SensorManager?
     private var menuManager: MenuManager?
     private var notificationManager: NotificationManager?
-    private let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
-    private let statusItemDisplayView = StatusItemDisplayView()
-    private let statusItemPlaceholderView = StatusItemPlaceholderView()
 
     func applicationDidFinishLaunching(_ aNotification: Notification) -> Void {
+        guard AppEnvironment.isRunningUnitTests == false else { return }
+
         let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.statusItem = statusItem
 
         let menu = NSMenu()
         statusItem.menu = menu
-        self.setStatusBarPlaceholder()
+        self.showPlaceholder()
 
-        let sensorManager = SensorManager()
+        let sensorManager = SensorManager(preferences: self.preferences)
         self.sensorManager = sensorManager
+        self.menuManager = MenuManager(
+            menu: menu,
+            sensorManager: sensorManager,
+            preferences: self.preferences,
+            updaterController: self.updaterController
+        )
+        self.notificationManager = NotificationManager(sensorManager: sensorManager, preferences: self.preferences)
 
-        self.menuManager = MenuManager(menu: menu, sensorManager: sensorManager, updaterController: self.updaterController)
-        self.notificationManager = NotificationManager(sensorManager: sensorManager)
+        let center = NotificationCenter.default
+        center.addObserver(self, selector: #selector(self.handleStatusItemInputsDidChange), name: .sensorDevicesDidChange, object: sensorManager)
+        center.addObserver(self, selector: #selector(self.handleScanStateChange), name: .aranetScanStateDidChange, object: sensorManager)
+        center.addObserver(self, selector: #selector(self.handleStatusItemInputsDidChange), name: .preferencesDidChange, object: self.preferences)
 
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleReadingDidUpdate),
-            name: .aranetReadingDidUpdate,
-            object: nil
-        )
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleScanStateChange),
-            name: .aranetScanStateDidChange,
-            object: nil
-        )
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleStatusBarDisplayPreferenceDidChange),
-            name: .statusBarDisplayPreferenceDidChange,
-            object: nil
-        )
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleDisplayUnitSystemPreferenceDidChange),
-            name: .displayUnitSystemPreferenceDidChange,
-            object: nil
-        )
-
-        Task {
-            do {
-                try await sensorManager.scan()
-                sensorManager.startMonitoring()
-                MenuTrackingRefresh.perform { [weak self] in
-                    self?.updateStatusBar()
-                    self?.menuManager?.refreshIfNeeded()
-                }
-            }
-            catch { NSLog("[AppDelegate] Scan failed: %@", error.localizedDescription) }
-        }
+        sensorManager.rescan()
     }
 
-    func applicationWillTerminate(_ aNotification: Notification) -> Void { self.sensorManager?.stopMonitoring() }
+    func applicationWillTerminate(_ aNotification: Notification) -> Void {
+        self.sensorManager?.stopMonitoring()
+    }
 
-    func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { return true }
+    func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
+        return true
+    }
 
-    // MARK: - Status Bar
+    // MARK: - Status Item
 
-    @objc private func handleReadingDidUpdate() -> Void {
-        MenuTrackingRefresh.perform { [weak self] in
-            self?.updateStatusBar()
-            self?.menuManager?.refreshIfNeeded()
-        }
+    @objc private func handleStatusItemInputsDidChange() -> Void {
+        self.scheduleStatusItemRefresh()
     }
 
     @objc private func handleScanStateChange() -> Void {
         if self.sensorManager?.isScanning == true {
-            self.setStatusBarPlaceholder()
+            self.showPlaceholder()
         }
         else {
-            MenuTrackingRefresh.perform { [weak self] in
-                self?.updateStatusBar()
-                self?.menuManager?.refreshIfNeeded()
-            }
+            self.scheduleStatusItemRefresh()
         }
     }
 
-    @objc private func handleStatusBarDisplayPreferenceDidChange() -> Void {
+    /// Refreshes on the common run loop modes, so the status item also updates while the menu is open.
+    private func scheduleStatusItemRefresh() -> Void {
         MenuTrackingRefresh.perform { [weak self] in
-            self?.updateStatusBar()
+            self?.updateStatusItem()
         }
     }
 
-    @objc private func handleDisplayUnitSystemPreferenceDidChange() -> Void {
-        MenuTrackingRefresh.perform { [weak self] in
-            self?.updateStatusBar()
-            self?.menuManager?.refreshIfNeeded()
-        }
-    }
-
-    private func updateStatusBar() -> Void {
+    /// Shows the pinned values, or the first available values of the first device with a reading, or the placeholder.
+    private func updateStatusItem() -> Void {
         guard let sensorManager = self.sensorManager else { return }
 
-        if let selection = StatusBarDisplayPreferences.selection {
-            guard let device = sensorManager.devices[selection.deviceId],
-                let reading = device.reading,
-                let values = StatusBarDisplayPreferences.valueStrings(for: selection, reading: reading)
-            else {
-                self.setStatusBarPlaceholder()
-                return
-            }
+        let unitSystem = self.preferences.displayUnitSystem
+        let reading: AranetReading?
+        let values: [String]
+        if let selection = self.preferences.statusBarSelection {
+            reading = sensorManager.devices[selection.deviceId]?.reading
+            values = reading.map { selection.valueStrings(for: $0, unitSystem: unitSystem) } ?? []
+        }
+        else {
+            reading = sensorManager.sortedDevices.first { $0.reading != nil }?.reading
+            values = reading.map { StatusBarDisplayMetric.defaultValueStrings(for: $0, unitSystem: unitSystem) } ?? []
+        }
 
-            self.applyStatusBarValues(values, label: self.compactStatusLabel(for: reading))
+        guard let reading else {
+            self.showPlaceholder()
+            return
+        }
+        guard values.isEmpty == false else {
+            self.showPlaceholder()
             return
         }
 
-        guard let reading = sensorManager.sortedDevices.first(where: { $0.reading != nil })?.reading else {
-            self.setStatusBarPlaceholder()
-            return
-        }
-
-        self.applyStatusBarValues(StatusBarDisplayPreferences.defaultValueStrings(for: reading), label: self.compactStatusLabel(for: reading))
+        self.showValues(StatusItemDisplayValue(label: Self.label(for: reading), values: values))
     }
 
-    private func applyStatusBarValues(_ values: [String], label: String) -> Void {
-        switch values.count {
-            case 1, 2:
-                self.applyCompactStatusBarValues(values, label: label)
-            default:
-                self.setStatusBarPlaceholder()
-        }
-    }
-
-    private func applyCompactStatusBarValues(_ values: [String], label: String) -> Void {
-        guard let statusItem = self.statusItem, let button = statusItem.button else { return }
-
-        let displayValue = StatusItemDisplayValue(label: label, values: values)
-        let width = StatusItemDisplayView.requiredWidth(for: displayValue)
-        let height = button.bounds.height > 0 ? button.bounds.height : NSStatusBar.system.thickness
-
-        self.removeStatusItemPlaceholderView()
-        statusItem.length = width
-        button.title = ""
-        button.image = nil
-
-        if self.statusItemDisplayView.superview !== button {
-            self.statusItemDisplayView.removeFromSuperview()
-            button.addSubview(self.statusItemDisplayView)
-        }
-
-        self.statusItemDisplayView.frame = NSRect(x: 0, y: 0, width: width, height: height)
-        self.statusItemDisplayView.autoresizingMask = [.height]
-        self.statusItemDisplayView.configure(value: displayValue)
-        button.needsDisplay = true
-        button.displayIfNeeded()
-        button.window?.displayIfNeeded()
-    }
-
-    private func compactStatusLabel(for reading: AranetReading) -> String {
-        return reading.deviceType == .aranetRadiation ? "RAD" : "AIR"
-    }
-
-    private func setStatusBarPlaceholder() -> Void {
-        guard let statusItem = self.statusItem, let button = statusItem.button else { return }
-
-        let width = StatusItemPlaceholderView.requiredWidth()
-        let height = button.bounds.height > 0 ? button.bounds.height : NSStatusBar.system.thickness
-
-        self.removeStatusItemDisplayView()
-        statusItem.length = width
-        button.title = ""
-        button.image = nil
-
-        if self.statusItemPlaceholderView.superview !== button {
-            self.statusItemPlaceholderView.removeFromSuperview()
-            button.addSubview(self.statusItemPlaceholderView)
-        }
-
-        self.statusItemPlaceholderView.frame = NSRect(x: 0, y: 0, width: width, height: height)
-        self.statusItemPlaceholderView.autoresizingMask = [.height]
-        self.statusItemPlaceholderView.startAnimating()
-        button.needsDisplay = true
-        button.displayIfNeeded()
-        button.window?.displayIfNeeded()
-    }
-
-    private func removeStatusItemDisplayView() -> Void {
-        self.statusItemDisplayView.removeFromSuperview()
-    }
-
-    private func removeStatusItemPlaceholderView() -> Void {
+    private func showValues(_ value: StatusItemDisplayValue) -> Void {
         self.statusItemPlaceholderView.stopAnimating()
         self.statusItemPlaceholderView.removeFromSuperview()
+        self.statusItemDisplayView.configure(value: value)
+        self.installStatusItemView(self.statusItemDisplayView, width: StatusItemDisplayView.requiredWidth(for: value))
+    }
+
+    private func showPlaceholder() -> Void {
+        self.statusItemDisplayView.removeFromSuperview()
+        self.installStatusItemView(self.statusItemPlaceholderView, width: StatusItemPlaceholderView.requiredWidth())
+        self.statusItemPlaceholderView.startAnimating()
+    }
+
+    /// Makes `view` the only content of the status item button, sized to `width` and the menu bar height.
+    private func installStatusItemView(_ view: NSView, width: CGFloat) -> Void {
+        guard let statusItem = self.statusItem else { return }
+        guard let button = statusItem.button else { return }
+
+        let height = button.bounds.height > 0 ? button.bounds.height : NSStatusBar.system.thickness
+        statusItem.length = width
+        button.title = ""
+        button.image = nil
+
+        if view.superview !== button {
+            view.removeFromSuperview()
+            button.addSubview(view)
+        }
+
+        view.frame = NSRect(x: 0, y: 0, width: width, height: height)
+        view.autoresizingMask = [.height]
+        button.needsDisplay = true
+        button.displayIfNeeded()
+        button.window?.displayIfNeeded()
+    }
+
+    private static func label(for reading: AranetReading) -> String {
+        return reading.deviceType == .aranetRadiation ? Self.radiationLabel : Self.airLabel
     }
 }

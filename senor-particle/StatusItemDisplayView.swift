@@ -1,10 +1,6 @@
 import Cocoa
 
-struct StatusItemDisplayValue {
-    let label: String
-    let values: [String]
-}
-
+/// Draws the status item values: a vertical `AIR` or `RAD` label column next to one or two value rows.
 final class StatusItemDisplayView: NSView {
     private static let labelFont = NSFont.monospacedSystemFont(ofSize: 6.5, weight: .semibold)
     private static let singleValueFont = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
@@ -13,6 +9,8 @@ final class StatusItemDisplayView: NSView {
     private static let labelValueGap: CGFloat = 3
     private static let labelWidth: CGFloat = 7
     private static let rowSpacing: CGFloat = 0
+    /// Optical correction that centers the digits rather than the font's full line box.
+    private static let valueVerticalOffset: CGFloat = -0.5
 
     private var displayValue = StatusItemDisplayValue(label: "", values: [])
 
@@ -35,7 +33,7 @@ final class StatusItemDisplayView: NSView {
         self.drawValues(self.displayValue.values, x: valueX)
     }
 
-    @MainActor static func requiredWidth(for value: StatusItemDisplayValue) -> CGFloat {
+    static func requiredWidth(for value: StatusItemDisplayValue) -> CGFloat {
         guard value.values.isEmpty == false else { return 0 }
 
         let maxValueWidth = value.values.map { Self.valueWidth(for: $0, count: value.values.count) }.max() ?? 0
@@ -73,7 +71,7 @@ final class StatusItemDisplayView: NSView {
         let totalHeight =
             CGFloat(attributedValues.count) * rowHeight
             + CGFloat(max(attributedValues.count - 1, 0)) * Self.rowSpacing
-        var y = max((self.bounds.height - totalHeight) / 2, 0) - 0.5
+        var y = max((self.bounds.height - totalHeight) / 2, 0) + Self.valueVerticalOffset
 
         for attributedValue in attributedValues {
             attributedValue.draw(at: NSPoint(x: x, y: y))
