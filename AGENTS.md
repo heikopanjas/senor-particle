@@ -80,7 +80,7 @@ When initializing a session or analyzing the workspace, refer to instruction fil
 1. **Maintain Consistency**: Keep code style consistent across the codebase
 2. **Test First**: Write tests before implementing features when applicable
 3. **Document Changes**: Update documentation when changing functionality
-4. **Code Review**: [Describe your code review process]
+4. **Code Review**: Findings and the phased fix plan live in `CODE_REVIEW.md`; load the `swift-coding-conventions`, `swift-concurrency-pro`, and `swift-testing-pro` skills for every review
 5. **Date Changes**: Update the "Last updated" timestamp in this file when making changes
 6. **Log Updates**: Add entries to the "Recent Updates & Decisions" log in `UPDATES.md`
 

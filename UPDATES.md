@@ -4,6 +4,13 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.0, code review fix plan 08:57)
+
+- added code_review.md with the findings of a full static review against the swift-coding-conventions, swift-concurrency-pro, and swift-testing-pro skills, plus a six-phase fix plan with milestones and verification commands
+- pointed the code review bullet in agents.md at that plan
+- rationale: the review found monitoring resilience bugs, a missing test target, and convention drift; one tracked plan keeps the fixes ordered by dependency
+- version: stays 1.2.0, documentation only
+
 ### 2026-10-22 (v1.2.0, agents.md skill cleanup 11:10)
 
 - replaced the embedded doomkit swift conventions with a pointer to the swift-coding-conventions skill plus app-target notes (internal access, appkit allowed, concurrency and testing skills)
