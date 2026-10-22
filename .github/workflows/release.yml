@@ -35,8 +35,68 @@ env:
   DESTINATION: generic/platform=macOS
 
 jobs:
+  lint:
+    name: Lint Swift Sources
+    runs-on: macos-26
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Lint Sources And Tests
+        run: xcrun swift-format lint --strict --recursive senor-particle SenorParticleTests
+
+  test:
+    name: ${{ matrix.name }}
+    runs-on: macos-26
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Unit Tests
+            sanitizer: "NO"
+          - name: Unit Tests Under Thread Sanitizer
+            sanitizer: "YES"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Show Xcode Version
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          xcode-select -p
+
+      - name: Run Unit Tests
+        env:
+          SANITIZER: ${{ matrix.sanitizer }}
+        run: |
+          set -euo pipefail
+          # Tests run ad-hoc signed and unsandboxed; signing secrets stay with the archive job.
+          xcodebuild test \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -destination "platform=macOS,arch=arm64" \
+            -derivedDataPath ".build/DerivedData/Tests-$SANITIZER" \
+            -clonedSourcePackagesDirPath "$PACKAGE_CACHE_DIR" \
+            -enableThreadSanitizer "$SANITIZER" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY=- \
+            "CODE_SIGN_IDENTITY[sdk=macosx*]=-" \
+            DEVELOPMENT_TEAM= \
+            "DEVELOPMENT_TEAM[sdk=macosx*]=" \
+            CODE_SIGN_ENTITLEMENTS= \
+            ENABLE_APP_SANDBOX=NO \
+            ENABLE_HARDENED_RUNTIME=NO
+
   release:
     name: Build And Notarize Release App
+    needs:
+      - lint
+      - test
     runs-on: macos-26
     timeout-minutes: 90
     outputs:
