@@ -1,7 +1,12 @@
 import Cocoa
 import ServiceManagement
+import os
 
-class GeneralViewController: NSViewController {
+/// Settings > General: start at login, notification personality, units, and scan timeout.
+final class GeneralViewController: NSViewController {
+    private static let designSize = NSSize(width: 420, height: 390)
+
+    private let preferences: PreferencesStore
     private let loginToggle = NSButton(checkboxWithTitle: "Start at Login", target: nil, action: nil)
     private let personalityPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let unitSystemControl = NSSegmentedControl(
@@ -11,22 +16,29 @@ class GeneralViewController: NSViewController {
         action: nil
     )
     private let timeoutLabel = NSTextField(labelWithString: "")
-    private let timeoutSlider = NSSlider(value: ScanPreferences.defaultTimeout, minValue: 10, maxValue: 60, target: nil, action: nil)
+    private let timeoutSlider = NSSlider(
+        value: PreferencesStore.defaultScanTimeout,
+        minValue: PreferencesStore.scanTimeoutRange.lowerBound,
+        maxValue: PreferencesStore.scanTimeoutRange.upperBound,
+        target: nil,
+        action: nil
+    )
 
     override var preferredContentSize: NSSize {
-        get { return self.isViewLoaded ? self.view.bounds.size : NSSize(width: 420, height: 390) }
+        get { return self.isViewLoaded == true ? self.view.bounds.size : Self.designSize }
         set {}
     }
 
-    init() {
+    init(preferences: PreferencesStore) {
+        self.preferences = preferences
         super.init(nibName: nil, bundle: nil)
     }
 
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func loadView() -> Void {
-        let width: CGFloat = 420
-        let height: CGFloat = 390
+        let width = Self.designSize.width
+        let height = Self.designSize.height
         let x: CGFloat = 20
         let controlWidth = width - 2 * x
         let descriptionHeight: CGFloat = 28
@@ -104,7 +116,8 @@ class GeneralViewController: NSViewController {
         y -= 4 + 22
         self.timeoutSlider.target = self
         self.timeoutSlider.action = #selector(self.sliderChanged(_:))
-        self.timeoutSlider.numberOfTickMarks = 51
+        // One tick per second across the range.
+        self.timeoutSlider.numberOfTickMarks = Int(PreferencesStore.scanTimeoutRange.upperBound - PreferencesStore.scanTimeoutRange.lowerBound) + 1
         self.timeoutSlider.allowsTickMarkValuesOnly = true
         self.timeoutSlider.frame = NSRect(x: x, y: y, width: controlWidth, height: 22)
         self.timeoutSlider.autoresizingMask = [.minYMargin, .width]
@@ -124,16 +137,16 @@ class GeneralViewController: NSViewController {
         super.viewWillAppear()
         self.loginToggle.state = SMAppService.mainApp.status == .enabled ? .on : .off
 
-        let timeout = ScanPreferences.timeout
+        let timeout = self.preferences.scanTimeout
         self.timeoutSlider.doubleValue = timeout
         self.updateTimeoutLabel(seconds: timeout)
 
-        let personality = NotificationPersonalityPreferences.current
+        let personality = self.preferences.notificationPersonality
         if let index = NotificationPersonality.allCases.firstIndex(of: personality) {
             self.personalityPopup.selectItem(at: index)
         }
 
-        let unitSystem = DisplayUnitSystemPreferences.current
+        let unitSystem = self.preferences.displayUnitSystem
         if let index = DisplayUnitSystem.allCases.firstIndex(of: unitSystem) {
             self.unitSystemControl.selectedSegment = index
         }
@@ -144,13 +157,13 @@ class GeneralViewController: NSViewController {
     @objc private func personalityChanged(_ sender: NSPopUpButton) -> Void {
         let index = sender.indexOfSelectedItem
         guard NotificationPersonality.allCases.indices.contains(index) == true else { return }
-        NotificationPersonalityPreferences.current = NotificationPersonality.allCases[index]
+        self.preferences.notificationPersonality = NotificationPersonality.allCases[index]
     }
 
     @objc private func unitSystemChanged(_ sender: NSSegmentedControl) -> Void {
         let index = sender.selectedSegment
         guard DisplayUnitSystem.allCases.indices.contains(index) == true else { return }
-        DisplayUnitSystemPreferences.current = DisplayUnitSystem.allCases[index]
+        self.preferences.displayUnitSystem = DisplayUnitSystem.allCases[index]
     }
 
     @objc private func toggleLogin(_ sender: NSButton) -> Void {
@@ -164,14 +177,15 @@ class GeneralViewController: NSViewController {
             }
         }
         catch {
-            NSLog("[Settings] Start at Login toggle failed: %@", error.localizedDescription)
+            let message = error.localizedDescription
+            Logger.settings.error("Start at Login toggle failed: \(message, privacy: .public)")
             self.loginToggle.state = SMAppService.mainApp.status == .enabled ? .on : .off
         }
     }
 
     @objc private func sliderChanged(_ sender: NSSlider) -> Void {
         let value = sender.doubleValue
-        ScanPreferences.storedTimeout = value
+        self.preferences.scanTimeout = value
         self.updateTimeoutLabel(seconds: value)
     }
 

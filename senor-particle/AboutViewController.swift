@@ -1,14 +1,29 @@
 import Cocoa
 import Sparkle
 
+/// Settings > About: app icon, name, version, and the Sparkle update controls.
 final class AboutViewController: NSViewController {
+    private static let designSize = NSSize(width: 420, height: 300)
+    private static let contentSize = NSSize(width: 380, height: 232)
+    private static let iconSize: CGFloat = 72
+    private static let iconY: CGFloat = 160
+    private static let nameLabelY: CGFloat = 132
+    private static let nameLabelHeight: CGFloat = 22
+    private static let nameFontSize: CGFloat = 18
+    private static let versionLabelY: CGFloat = 109
+    private static let versionLabelHeight: CGFloat = 18
+    private static let updateButtonSize = NSSize(width: 160, height: 32)
+    private static let updateButtonY: CGFloat = 70
+    private static let toggleRowSpacing: CGFloat = 30
+    private static let toggleHeight: CGFloat = 22
+
     private let updaterController: SPUStandardUpdaterController
     private let checkForUpdatesButton = NSButton(title: "Check for Updates\u{2026}", target: nil, action: nil)
     private let automaticChecksToggle = NSButton(checkboxWithTitle: "Automatically check for updates", target: nil, action: nil)
     private let automaticDownloadsToggle = NSButton(checkboxWithTitle: "Automatically download updates", target: nil, action: nil)
 
     override var preferredContentSize: NSSize {
-        get { return self.isViewLoaded ? self.view.bounds.size : NSSize(width: 420, height: 300) }
+        get { return self.isViewLoaded == true ? self.view.bounds.size : Self.designSize }
         set {}
     }
 
@@ -20,10 +35,10 @@ final class AboutViewController: NSViewController {
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func loadView() -> Void {
-        let width: CGFloat = 420
-        let height: CGFloat = 300
-        let contentWidth: CGFloat = 380
-        let contentHeight: CGFloat = 232
+        let width = Self.designSize.width
+        let height = Self.designSize.height
+        let contentWidth = Self.contentSize.width
+        let contentHeight = Self.contentSize.height
 
         self.view = NSView(frame: NSRect(x: 0, y: 0, width: width, height: height))
 
@@ -37,27 +52,32 @@ final class AboutViewController: NSViewController {
         contentView.autoresizingMask = [.minXMargin, .maxXMargin, .minYMargin, .maxYMargin]
         self.view.addSubview(contentView)
 
-        let iconView = NSImageView(frame: NSRect(x: (contentWidth - 72) / 2, y: 160, width: 72, height: 72))
+        let iconView = NSImageView(
+            frame: NSRect(x: (contentWidth - Self.iconSize) / 2, y: Self.iconY, width: Self.iconSize, height: Self.iconSize)
+        )
         iconView.image = NSApp.applicationIconImage
         iconView.imageScaling = .scaleProportionallyUpOrDown
         contentView.addSubview(iconView)
 
         let nameLabel = NSTextField(labelWithString: Bundle.main.displayName)
-        nameLabel.font = .boldSystemFont(ofSize: 18)
+        nameLabel.font = .boldSystemFont(ofSize: Self.nameFontSize)
         nameLabel.alignment = .center
-        nameLabel.frame = NSRect(x: 0, y: 132, width: contentWidth, height: 22)
+        nameLabel.frame = NSRect(x: 0, y: Self.nameLabelY, width: contentWidth, height: Self.nameLabelHeight)
         contentView.addSubview(nameLabel)
 
         let versionLabel = NSTextField(labelWithString: "Version \(self.marketingVersion) (\(self.buildNumber))")
         versionLabel.textColor = .secondaryLabelColor
         versionLabel.alignment = .center
-        versionLabel.frame = NSRect(x: 0, y: 109, width: contentWidth, height: 18)
+        versionLabel.frame = NSRect(x: 0, y: Self.versionLabelY, width: contentWidth, height: Self.versionLabelHeight)
         contentView.addSubview(versionLabel)
 
         self.checkForUpdatesButton.target = self.updaterController
         self.checkForUpdatesButton.action = #selector(SPUStandardUpdaterController.checkForUpdates(_:))
-        self.checkForUpdatesButton.frame = NSRect(x: (contentWidth - 160) / 2, y: 70, width: 160, height: 32)
-        self.checkForUpdatesButton.bind(.enabled, to: self.updaterController.updater, withKeyPath: "canCheckForUpdates")
+        self.checkForUpdatesButton.frame = NSRect(
+            origin: NSPoint(x: (contentWidth - Self.updateButtonSize.width) / 2, y: Self.updateButtonY),
+            size: Self.updateButtonSize
+        )
+        self.checkForUpdatesButton.bind(.enabled, to: self.updaterController.updater, withKeyPath: #keyPath(SPUUpdater.canCheckForUpdates))
         contentView.addSubview(self.checkForUpdatesButton)
 
         self.automaticChecksToggle.target = self
@@ -70,7 +90,8 @@ final class AboutViewController: NSViewController {
         let toggleWidth = toggles.map { $0.fittingSize.width }.max() ?? contentWidth
         let toggleX = ((contentWidth - toggleWidth) / 2).rounded()
         for (index, toggle) in toggles.enumerated() {
-            toggle.frame = NSRect(x: toggleX, y: CGFloat(toggles.count - 1 - index) * 30, width: toggleWidth, height: 22)
+            let toggleY = CGFloat(toggles.count - 1 - index) * Self.toggleRowSpacing
+            toggle.frame = NSRect(x: toggleX, y: toggleY, width: toggleWidth, height: Self.toggleHeight)
             contentView.addSubview(toggle)
         }
     }
@@ -80,7 +101,7 @@ final class AboutViewController: NSViewController {
         self.refreshUpdatePreferences()
     }
 
-    deinit {
+    isolated deinit {
         self.checkForUpdatesButton.unbind(.enabled)
     }
 

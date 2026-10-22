@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/heikopanjas/aranet-kit",
       "state" : {
-        "revision" : "75eedd0db4a18d8fd120d44b8c60d4a67e2e8ba8",
-        "version" : "3.5.2"
+        "revision" : "6f092c61017a07b4165b654f426750d3aef8c0c8",
+        "version" : "4.0.0"
       }
     },
     {

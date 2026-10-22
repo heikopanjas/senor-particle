@@ -1,56 +1,5 @@
-import AranetKit
 import Cocoa
-import ServiceManagement
 import Sparkle
-
-// MARK: - Degraded situation preferences
-
-enum DegradedSituationPreferences {
-    static let key = "degradedSituationCycles"
-    static let defaultCycles = 3
-    static let minimumCycles = 1
-    static let maximumCycles = 10
-
-    static var cycles: Int {
-        get {
-            let stored = UserDefaults.standard.integer(forKey: Self.key)
-            if stored < Self.minimumCycles { return Self.defaultCycles }
-            return min(stored, Self.maximumCycles)
-        }
-        set {
-            UserDefaults.standard.set(min(max(newValue, Self.minimumCycles), Self.maximumCycles), forKey: Self.key)
-        }
-    }
-}
-
-// MARK: - Notification preferences
-
-enum NotificationPreferences {
-    static func isEnabled(for deviceId: UUID) -> Bool {
-        return UserDefaults.standard.bool(forKey: "notifications.\(deviceId.uuidString)")
-    }
-
-    static func setEnabled(_ enabled: Bool, for deviceId: UUID) -> Void {
-        UserDefaults.standard.set(enabled, forKey: "notifications.\(deviceId.uuidString)")
-    }
-}
-
-// MARK: - Device name preferences
-
-enum DeviceNamePreferences {
-    static func name(for deviceId: UUID) -> String? {
-        return UserDefaults.standard.string(forKey: "deviceName.\(deviceId.uuidString)")
-    }
-
-    static func setName(_ name: String, for deviceId: UUID) -> Void {
-        if name.isEmpty == true {
-            UserDefaults.standard.removeObject(forKey: "deviceName.\(deviceId.uuidString)")
-        }
-        else {
-            UserDefaults.standard.set(name, forKey: "deviceName.\(deviceId.uuidString)")
-        }
-    }
-}
 
 // MARK: - Toolbar identifiers
 
@@ -63,7 +12,11 @@ extension NSToolbarItem.Identifier {
 
 // MARK: - SettingsWindowController
 
-class SettingsWindowController: NSWindowController {
+/// The shared Settings window with its General, Devices, Advanced, and About tabs.
+final class SettingsWindowController: NSWindowController {
+    private static let tabIdentifiers: [NSToolbarItem.Identifier] = [.general, .devices, .advancedSettings, .about]
+    private static let initialContentSize = NSSize(width: 420, height: 72)
+
     private var didCenter = false
     private let generalVC: GeneralViewController
     private let devicesVC: DevicesViewController
@@ -71,15 +24,15 @@ class SettingsWindowController: NSWindowController {
     private let aboutVC: AboutViewController
     private var selectedIdentifier = NSToolbarItem.Identifier.general
 
-    init(sensorManager: SensorManager, updaterController: SPUStandardUpdaterController) {
-        self.generalVC = GeneralViewController()
-        self.devicesVC = DevicesViewController(sensorManager: sensorManager)
-        self.advancedSettingsVC = AdvancedSettingsViewController()
+    init(sensorManager: SensorManager, preferences: PreferencesStore, updaterController: SPUStandardUpdaterController) {
+        self.generalVC = GeneralViewController(preferences: preferences)
+        self.devicesVC = DevicesViewController(sensorManager: sensorManager, preferences: preferences)
+        self.advancedSettingsVC = AdvancedSettingsViewController(preferences: preferences)
         self.aboutVC = AboutViewController(updaterController: updaterController)
 
         super.init(
             window: NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 420, height: 72),
+                contentRect: NSRect(origin: .zero, size: Self.initialContentSize),
                 styleMask: [.titled, .closable],
                 backing: .buffered,
                 defer: false
@@ -129,8 +82,11 @@ class SettingsWindowController: NSWindowController {
     @objc private func showAdvancedSettings() -> Void { self.switchToTab(.advancedSettings) }
     @objc private func showAbout() -> Void { self.switchToTab(.about) }
 
+    /// Shows the tab's view controller; its view is loaded and sized to the current content first, so the window keeps
+    /// its size instead of adopting the tab's design size.
     private func switchToTab(_ identifier: NSToolbarItem.Identifier) -> Void {
-        guard identifier != self.selectedIdentifier, let window = self.window else { return }
+        guard identifier != self.selectedIdentifier else { return }
+        guard let window = self.window else { return }
         self.selectedIdentifier = identifier
         let newViewController = self.viewController(for: identifier)
         if let contentBounds = window.contentView?.bounds {
@@ -167,15 +123,15 @@ class SettingsWindowController: NSWindowController {
 
 extension SettingsWindowController: NSToolbarDelegate {
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        return [.general, .devices, .advancedSettings, .about]
+        return Self.tabIdentifiers
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        return [.general, .devices, .advancedSettings, .about]
+        return Self.tabIdentifiers
     }
 
     func toolbarSelectableItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        return [.general, .devices, .advancedSettings, .about]
+        return Self.tabIdentifiers
     }
 
     func toolbar(
