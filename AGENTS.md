@@ -1503,18 +1503,17 @@ open senor-particle.xcodeproj
 ### Development (Command Line)
 
 Always pass `-destination "generic/platform=macOS"` to avoid ambiguous destination warnings.
-Debug builds write the app bundle to `Build/Products/Debug/Senor Particle.app` inside the repository.
-`Build/` is the only supported generated root. Xcode products, intermediates, caches, indexes, logs, SDK stat caches, Swift package checkouts, local distribution output, and CI staging all remain below it. The shared workspace routes IDE Derived Data to `Build/DerivedData`; scripted builds must also pass `-derivedDataPath` and `-clonedSourcePackagesDirPath` explicitly. Do not add project-level `SYMROOT` or `OBJROOT` overrides because Xcode treats those as legacy build locations and rejects Swift package dependencies.
+`.build/` is the only supported generated root. Xcode products, intermediates, caches, indexes, logs, SDK stat caches, Swift package checkouts, local distribution output, and CI staging all remain below it. Project build settings route module, compilation, index, log, SDK stat, and package caches to `$(PROJECT_DIR)/.build/...`. The shared workspace settings give the Xcode IDE a custom workspace-relative build location (`.build/Products`, `.build/Intermediates`) and Derived Data in `.build/DerivedData`, so IDE Debug builds write `.build/Products/Debug/Senor Particle.app`. `xcodebuild` ignores shared workspace settings, so scripted builds must pass `-derivedDataPath` and `-clonedSourcePackagesDirPath` explicitly; with default Xcode Locations preferences their products land in `.build/DerivedData/CLI/Build/Products`. Do not add project-level `SYMROOT` or `OBJROOT` overrides because Xcode treats those as legacy build locations and rejects Swift package dependencies.
 
 ```bash
 # Build the project (debug)
-xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -destination "generic/platform=macOS" -configuration Debug -derivedDataPath Build/DerivedData/CLI -clonedSourcePackagesDirPath Build/SourcePackages build
+xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -destination "generic/platform=macOS" -configuration Debug -derivedDataPath .build/DerivedData/CLI -clonedSourcePackagesDirPath .build/SourcePackages build
 
 # Run tests
-xcodebuild test -project senor-particle.xcodeproj -scheme senor-particle -destination "generic/platform=macOS" -derivedDataPath Build/DerivedData/CLI -clonedSourcePackagesDirPath Build/SourcePackages
+xcodebuild test -project senor-particle.xcodeproj -scheme senor-particle -destination "generic/platform=macOS" -derivedDataPath .build/DerivedData/CLI -clonedSourcePackagesDirPath .build/SourcePackages
 
 # Clean build artifacts
-xcodebuild clean -project senor-particle.xcodeproj -scheme senor-particle -destination "generic/platform=macOS" -derivedDataPath Build/DerivedData/CLI -clonedSourcePackagesDirPath Build/SourcePackages
+xcodebuild clean -project senor-particle.xcodeproj -scheme senor-particle -destination "generic/platform=macOS" -derivedDataPath .build/DerivedData/CLI -clonedSourcePackagesDirPath .build/SourcePackages
 ```
 
 ### Build & Deploy
@@ -1537,7 +1536,7 @@ Use `build.sh` for archive, export, and optional notarization:
 
 ### Continuous Integration
 
-`.github/workflows/build.yml` runs signed ARM64 Developer ID builds on pushes and pull requests for `develop` and `feature/**`. `.github/workflows/release.yml` validates pull requests targeting `main`, then runs on pushes to `main` after merge. Both import the signing certificate into temporary runner storage, use `Build/DerivedData/CI` plus `Build/SourcePackages`, stage distribution files under `Build/CI`, archive and export the app, verify its signature and architecture, generate `CHANGELOG.md` and `BILL_OF_MATERIALS.md`, and upload the packaged zip. The release workflow alone uses versioned release artifact names and performs Apple notarization, stapling, and Gatekeeper verification. It uses the Sparkle publishing tool from the deterministic package artifact directory. It also creates a notarized app-only Sparkle archive, generates an EdDSA-signed appcast with deltas disabled, and validates the feed during pull requests. Post-merge, it publishes the normal `v<MARKETING_VERSION>` release, uploads versioned archives and notes to the mutable `sparkle-updates` prerelease, then deploys only `appcast.xml` to GitHub Pages. Update assets must be published before the feed. Release publication is retry-safe only when an existing version tag targets the same commit; otherwise increment `MARKETING_VERSION`. Use `GITHUB_RUN_NUMBER` as the monotonically increasing `CFBundleVersion`. Both workflows use `macos-26`, `actions/checkout@v6`, and `actions/upload-artifact@v6`; publication uses `actions/download-artifact@v8`, and Pages uses the official configure, upload, and deploy actions.
+`.github/workflows/build.yml` runs signed ARM64 Developer ID builds on pushes and pull requests for `develop` and `feature/**`. `.github/workflows/release.yml` validates pull requests targeting `main`, then runs on pushes to `main` after merge. Both import the signing certificate into temporary runner storage, use `.build/DerivedData/CI` plus `.build/SourcePackages`, stage distribution files under `.build/CI`, archive and export the app, verify its signature and architecture, generate `CHANGELOG.md` and `BILL_OF_MATERIALS.md`, and upload the packaged zip. The release workflow alone uses versioned release artifact names and performs Apple notarization, stapling, and Gatekeeper verification. It uses the Sparkle publishing tool from the deterministic package artifact directory. It also creates a notarized app-only Sparkle archive, generates an EdDSA-signed appcast with deltas disabled, and validates the feed during pull requests. Post-merge, it publishes the normal `v<MARKETING_VERSION>` release, uploads versioned archives and notes to the mutable `sparkle-updates` prerelease, then deploys only `appcast.xml` to GitHub Pages. Update assets must be published before the feed. Release publication is retry-safe only when an existing version tag targets the same commit; otherwise increment `MARKETING_VERSION`. Use `GITHUB_RUN_NUMBER` as the monotonically increasing `CFBundleVersion`. Both workflows use `macos-26`, `actions/checkout@v6`, and `actions/upload-artifact@v6`; publication uses `actions/download-artifact@v8`, and Pages uses the official configure, upload, and deploy actions.
 
 The build workflow requires repository secrets `APPLE_CERTIFICATE_P12_BASE64`, `APPLE_CERTIFICATE_PASSWORD`, and `APPLE_SIGNING_IDENTITY`. The release workflow additionally requires `APPSTORE_CONNECT_KEY_ID`, `APPSTORE_CONNECT_ISSUER_ID`, and `APPSTORE_CONNECT_KEY_P8_BASE64` for App Store Connect API key notarization plus `SPARKLE_ED_PRIVATE_KEY` for appcast/update signing, for seven secrets in total. The Sparkle key uses Keychain account `com.panjas.senor-particle`; retain an encrypted offline backup of its exported private key. The non-sensitive team ID is read from `exportOptions.plist`. Configure repository Pages with GitHub Actions as its source. Version 1.1.0 is the Sparkle bootstrap release, so 1.0 installations require one final manual upgrade.
 
@@ -1548,10 +1547,10 @@ The build workflow requires repository secrets `APPLE_CERTIFICATE_P12_BASE64`, `
 # File > Add Packages... in Xcode
 
 # Update package dependencies
-xcodebuild -resolvePackageDependencies -project senor-particle.xcodeproj -scheme senor-particle -derivedDataPath Build/DerivedData/CLI -clonedSourcePackagesDirPath Build/SourcePackages
+xcodebuild -resolvePackageDependencies -project senor-particle.xcodeproj -scheme senor-particle -derivedDataPath .build/DerivedData/CLI -clonedSourcePackagesDirPath .build/SourcePackages
 
 # Show resolved package versions
-xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -destination "generic/platform=macOS" -derivedDataPath Build/DerivedData/CLI -clonedSourcePackagesDirPath Build/SourcePackages -showBuildSettings | grep PACKAGE
+xcodebuild -project senor-particle.xcodeproj -scheme senor-particle -destination "generic/platform=macOS" -derivedDataPath .build/DerivedData/CLI -clonedSourcePackagesDirPath .build/SourcePackages -showBuildSettings | grep PACKAGE
 ```
 
 ### Code Quality

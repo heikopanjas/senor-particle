@@ -4,6 +4,16 @@ This file is the append-only log of project decisions and notable changes, maint
 
 <!-- {changelog} -->
 
+### 2026-10-22 (v1.2.0, build output in .build 10:50)
+
+- moved every generated root from build to .build: project cache settings, shared workspace settings, build.sh, both ci workflows, readme, and agents
+- shared workspace settings now pin a custom workspace-relative location (.build/Products, .build/Intermediates) instead of deferring to xcode app preferences
+- also repointed the sdk stat cache and derived data dir settings that still wrote to build
+- rationale: one hidden generated root, and ide output no longer depends on each developer's xcode locations preference
+- xcodebuild ignores shared workspace settings, so scripted builds keep passing explicit derived data and package paths
+- github upload-artifact skips hidden files by item name only, so artifact paths below .build/CI still upload
+- supersedes the 2026-07-26 decision to consolidate under build
+
 ### 2026-10-22 (v1.2.0, log moved to updates.md 10:40)
 
 - moved all recent updates and decisions entries from agents.md into updates.md, unchanged, sorted newest first

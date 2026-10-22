@@ -4,7 +4,7 @@ set -euo pipefail
 PROJECT="senor-particle.xcodeproj"
 SCHEME="senor-particle"
 APP_NAME="Senor Particle"
-BUILD_ROOT="Build"
+BUILD_ROOT=".build"
 LOCAL_OUTPUT_DIR="${BUILD_ROOT}/Local"
 DERIVED_DATA_PATH="${BUILD_ROOT}/DerivedData/CLI"
 PACKAGE_CACHE_DIR="${BUILD_ROOT}/SourcePackages"

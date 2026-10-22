@@ -17,16 +17,16 @@ env:
   PROJECT: senor-particle.xcodeproj
   SCHEME: senor-particle
   APP_NAME: Senor Particle
-  BUILD_DIR: Build/CI
-  DERIVED_DATA_PATH: Build/DerivedData/CI
-  ARCHIVE_PATH: Build/CI/Senor Particle.xcarchive
-  EXPORT_PATH: Build/CI/export
+  BUILD_DIR: .build/CI
+  DERIVED_DATA_PATH: .build/DerivedData/CI
+  ARCHIVE_PATH: .build/CI/Senor Particle.xcarchive
+  EXPORT_PATH: .build/CI/export
   EXPORT_PLIST: exportOptions.plist
-  APP_PATH: Build/CI/export/Senor Particle.app
-  CHANGELOG_PATH: Build/CI/CHANGELOG.md
-  BOM_PATH: Build/CI/BILL_OF_MATERIALS.md
-  PACKAGE_DIR: Build/CI/package
-  PACKAGE_CACHE_DIR: Build/SourcePackages
+  APP_PATH: .build/CI/export/Senor Particle.app
+  CHANGELOG_PATH: .build/CI/CHANGELOG.md
+  BOM_PATH: .build/CI/BILL_OF_MATERIALS.md
+  PACKAGE_DIR: .build/CI/package
+  PACKAGE_CACHE_DIR: .build/SourcePackages
   PACKAGE_RESOLVED: senor-particle.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
   DESTINATION: generic/platform=macOS
 
