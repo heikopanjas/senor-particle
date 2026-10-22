@@ -1,21 +1,11 @@
-.claude/skills/git-workflow/SKILL.md:
-  original_sha: e77221a6957de986cdd456c69f80d4009ac8bf5e118a3e926c47260746ae92be
+UPDATES.md:
+  original_sha: ff56fd563cb60b9073230b3b0721e5687c98fd7888129b47f2bbc557e9c9c940
   template_version: 5
-  installed_date: 2026-08-27T21:48:52.826395+00:00
+  installed_date: 2026-08-27T21:48:52.825932+00:00
   lang: []
-  agent:
-  - claude
-  ref_count: 1
-  category: skill
-.claude/skills/recent-updates/SKILL.md:
-  original_sha: 27fbb14192738a4e76042bf7322b4b529f4996354fa427700624deccd3ef6dc9
-  template_version: 5
-  installed_date: 2026-08-27T21:48:52.826748+00:00
-  lang: []
-  agent:
-  - claude
-  ref_count: 1
-  category: skill
+  agent: []
+  ref_count: 0
+  category: integration
 .gitattributes:
   original_sha: b06645d6d1fca42aa742230b5ea0875ba8b996198073db1872402a9ca7ac6356
   template_version: 5
@@ -33,18 +23,37 @@
   - claude
   ref_count: 1
   category: agent
-UPDATES.md:
-  original_sha: ff56fd563cb60b9073230b3b0721e5687c98fd7888129b47f2bbc557e9c9c940
-  template_version: 5
-  installed_date: 2026-08-27T21:48:52.825932+00:00
-  lang: []
-  agent: []
-  ref_count: 0
-  category: integration
 .claude/skills/semantic-versioning/SKILL.md:
   original_sha: d313d5c1a851aaf9b8cebc250e280cbe37bc70fdb06d95f74de6b60eafdf5f4d
   template_version: 5
   installed_date: 2026-08-27T21:48:52.826579+00:00
+  lang: []
+  agent:
+  - claude
+  ref_count: 1
+  category: skill
+CLAUDE.md:
+  original_sha: eb7e86a5cd044d553afc7d464e33eea906f229a5637979cde2e864e0cf573cfa
+  template_version: 5
+  installed_date: 2026-10-22T08:18:27.525679+00:00
+  lang: []
+  agent:
+  - claude
+  ref_count: 1
+  category: agent
+.claude/skills/recent-updates/SKILL.md:
+  original_sha: 27fbb14192738a4e76042bf7322b4b529f4996354fa427700624deccd3ef6dc9
+  template_version: 5
+  installed_date: 2026-08-27T21:48:52.826748+00:00
+  lang: []
+  agent:
+  - claude
+  ref_count: 1
+  category: skill
+.claude/skills/git-workflow/SKILL.md:
+  original_sha: e77221a6957de986cdd456c69f80d4009ac8bf5e118a3e926c47260746ae92be
+  template_version: 5
+  installed_date: 2026-08-27T21:48:52.826395+00:00
   lang: []
   agent:
   - claude
